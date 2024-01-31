@@ -38,7 +38,7 @@ namespace DivineDragon
             
             var outputDirectory = DivineDragonSettingsScriptableObject.instance.getBundleOutputPath();
 
-            var args = String.Format("fix \"{0}\" \"{1}\"", outputDirectory, result.OutputPath);
+            var args = String.Format("fix \"{0}\" \"{1}\"", outputDirectory, outputDirectory + result.OutputPath);
             
 
             var bundleTools = "bundle_tools";
