@@ -63,7 +63,7 @@ namespace DivineDragon
         static void RunProcess(string command, bool runShell, string args = null)
         {
             string projectCurrentDir = Directory.GetCurrentDirectory();
-            command = projectCurrentDir + "/Assets/" + command;
+            command = "Packages/com.unity.divine-builder/" + command;
  
             UnityEngine.Debug.Log(string.Format("{0} Run command: {1}", DateTime.Now, command));
  
