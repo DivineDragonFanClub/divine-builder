@@ -60,7 +60,7 @@ namespace DivineDragon
             // 5
             // Import UXML
             var visualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>
-                ("Assets/Editor/DivineWindow.uxml");
+                ("Packages/com.unity.divine-builder/Editor/DivineWindow.uxml");
             VisualElement divineWindow = visualTree.CloneTree();
             root.Add(divineWindow);
             
