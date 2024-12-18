@@ -5,4 +5,8 @@
     <ui:Button text="Open output path" display-tooltip-when-elided="true" name="OpenOutputPath" tooltip="Verify that you set the right path" style="margin-bottom: 10px;" />
     <ui:Toggle label="Open output folder after build" name="openAfterBuildCheckbox" />
     <ui:Button text="Build Addressables and Patch Bundles" display-tooltip-when-elided="true" name="BuildAddressablesDivine" />
+    <ui:TextField picking-mode="Ignore" label="SD Card Path" name="SDCardField" usage-hints="None" tooltip="Enter a path directly" binding-path="sdCardPath" />
+    <ui:Button text="Browse for SD Card path" display-tooltip-when-elided="true" name="BrowseSDPath" />
+    <ui:TextField picking-mode="Ignore" label="Mod Path" name="modPathField" usage-hints="None" tooltip="Enter a path directly" binding-path="modPath" style="height: 18px;" />
+    <ui:Button text="Browse for mod path" display-tooltip-when-elided="true" name="BrowseModPath" />
 </ui:UXML>

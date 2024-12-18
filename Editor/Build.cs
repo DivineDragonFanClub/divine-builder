@@ -35,8 +35,16 @@ namespace DivineDragon
                 Debug.LogError("Addressables build error encountered: " + result.Error);
                 return false;
             }
+
+            var outputDirectory = BuildModOutputPath();
             
-            var outputDirectory = DivineDragonSettingsScriptableObject.instance.getBundleOutputPath();
+            Debug.Log(outputDirectory);
+            
+            if (!Directory.Exists(outputDirectory))
+            {
+                Directory.CreateDirectory(outputDirectory);
+            }
+            
             string projectCurrentDir = Directory.GetCurrentDirectory();
 
             var args = String.Format("fix \"{0}\" \"{1}\"", outputDirectory, Path.GetFullPath(Path.Combine(projectCurrentDir, result.OutputPath)));
@@ -59,6 +67,17 @@ namespace DivineDragon
             }
 
             return success;
+        }
+
+        private static string dataPath = "Data/StreamingAssets/aa/Switch";
+        
+        /**
+         * Build the modPath/dataPath, path.
+         */
+        
+        static string BuildModOutputPath()
+        {
+            return Path.Combine(DivineDragonSettingsScriptableObject.instance.getModPath(), dataPath);
         }
         
         static void RunProcess(string command, bool runShell, string args = null)
