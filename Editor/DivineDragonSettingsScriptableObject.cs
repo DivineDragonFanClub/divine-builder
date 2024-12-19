@@ -60,6 +60,7 @@ namespace DivineDragon
         private TextField sdPathField;
         private TextField modPathField;
         private Label buildStatusLabel;
+        private Color cobaltBlue = new Color(0.0f, 0.28f, 0.67f, 1.0f);
 
         [MenuItem("Divine Dragon/Divine Dragon Window")]
         public static void ShowSettings()
@@ -191,10 +192,10 @@ namespace DivineDragon
             };
         }
 
-
+        private Button buildButton;
         private void InitializeBuildButton(VisualElement divineWindow)
         {
-            Button buildButton = divineWindow.Q<Button>("BuildAddressablesDivine");
+            buildButton = divineWindow.Q<Button>("BuildAddressablesDivine");
 
             buildButton.SetEnabled(!String.IsNullOrEmpty(DivineDragonSettingsScriptableObject.instance.getModPath()));
 
@@ -269,37 +270,41 @@ namespace DivineDragon
 
         private void UpdateBuildStatus()
         {
-            SetFieldBorderColorAndWidth(sdPathField, Color.black, 0);
-            SetFieldBorderColorAndWidth(modPathField, Color.black, 0);
+            SetFieldBorderColorAndWidth(sdPathField, Color.clear, 1);
+            SetFieldBorderColorAndWidth(modPathField, Color.clear, 1);
+            SetFieldBorderColorAndWidth(buildButton, Color.clear, 1);
+
             if (string.IsNullOrEmpty(sdPathField.value))
             {
                 buildStatusLabel.text = "Please set the SD path.";
-                buildStatusLabel.style.color = Color.red;
-                SetFieldBorderColorAndWidth(sdPathField, Color.red, 1);
+                buildStatusLabel.style.color = Color.green;
+                SetFieldBorderColorAndWidth(sdPathField, cobaltBlue, 1);
             }
             else if (string.IsNullOrEmpty(modPathField.value))
             {
                 buildStatusLabel.text = "Please set the mod path.";
-                buildStatusLabel.style.color = Color.red;
-                SetFieldBorderColorAndWidth(modPathField, Color.red, 1);
+                buildStatusLabel.style.color = Color.green;
+                SetFieldBorderColorAndWidth(modPathField, cobaltBlue, 1);
             }
             else
             {
                 buildStatusLabel.text = "Ready to build.";
                 buildStatusLabel.style.color = Color.green;
+                SetFieldBorderColorAndWidth(buildButton, cobaltBlue, 1);
+                
             }
         }
 
-        private void SetFieldBorderColorAndWidth(TextField field, Color color, float width)
+        private void SetFieldBorderColorAndWidth(VisualElement element, Color color, float width)
         {
-            field.style.borderTopColor = color;
-            field.style.borderBottomColor = color;
-            field.style.borderLeftColor = color;
-            field.style.borderRightColor = color;
-            field.style.borderBottomWidth = width;
-            field.style.borderTopWidth = width;
-            field.style.borderLeftWidth = width;
-            field.style.borderRightWidth = width;
+            element.style.borderTopColor = color;
+            element.style.borderBottomColor = color;
+            element.style.borderLeftColor = color;
+            element.style.borderRightColor = color;
+            element.style.borderBottomWidth = width;
+            element.style.borderTopWidth = width;
+            element.style.borderLeftWidth = width;
+            element.style.borderRightWidth = width;
         }
     }
 }

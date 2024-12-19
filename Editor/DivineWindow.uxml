@@ -11,14 +11,14 @@
         </ui:VisualElement>
         <ui:VisualElement name="modpathContainer" style="margin-left: 3px; margin-right: 3px; margin-top: 1px; margin-bottom: 10px;">
             <ui:Label text="Mod Path" display-tooltip-when-elided="true" name="modlabel" style="margin-bottom: 5px; font-size: 16px;" />
-            <ui:TextField picking-mode="Ignore" name="modPathField" usage-hints="None" tooltip="Enter a path directly" binding-path="modPath" style="height: 18px; margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0;" />
+            <ui:TextField picking-mode="Ignore" name="modPathField" usage-hints="None" tooltip="Enter a path directly" binding-path="modPath" style="height: 18px; margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0; border-left-color: rgba(255, 0, 0, 255); border-right-color: rgba(255, 0, 0, 255); border-top-color: rgba(255, 0, 0, 255); border-bottom-color: rgba(255, 0, 0, 255);" />
             <ui:VisualElement name="buttonContainer" style="align-items: flex-end;">
                 <ui:Button text="Browse for mod path" display-tooltip-when-elided="true" name="BrowseModPath" tooltip="Select the mod folder you want to build to. Zip files are not currently supported." style="margin-bottom: 0; margin-left: 0; margin-right: 0; margin-top: 5px;" />
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="buildContainer" style="bottom: auto; position: relative; width: 100%; margin-left: 3px; margin-right: 3px; margin-top: 1px; margin-bottom: 1px;">
             <ui:Label text="Build" display-tooltip-when-elided="true" name="BuildLabel" style="margin-bottom: 5px; font-size: 16px;" />
-            <ui:Label text="Ready to build" display-tooltip-when-elided="true" style="color: rgba(0, 255, 70, 255);" />
+            <ui:Label text="Ready to build" display-tooltip-when-elided="true" name="buildStatusLabel" style="color: rgb(0, 255, 70); font-size: 14px;" />
             <ui:Button text="Build" display-tooltip-when-elided="true" name="BuildAddressablesDivine" style="border-left-color: rgb(0, 71, 171); border-right-color: rgb(0, 71, 171); border-top-color: rgb(0, 71, 171); border-bottom-color: rgb(0, 71, 171); margin-bottom: 3px; margin-left: 0; margin-right: 0; margin-top: 0;" />
             <ui:Toggle label="Open output folder after build" name="openAfterBuildCheckbox" />
         </ui:VisualElement>
