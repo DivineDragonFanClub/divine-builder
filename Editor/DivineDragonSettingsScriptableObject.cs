@@ -220,9 +220,30 @@ namespace DivineDragon
             {
                 // Check if we're on Windows or Mac (sorry linux users)
                 var platform = Application.platform;
+
                 if (platform == RuntimePlatform.WindowsEditor)
                 {
                     Debug.Log("handle windows");
+                    // Check if the standard Ryujinx path exists
+                    var ryujinxSd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Ryujinx\\sdcard");
+
+                    if (Directory.Exists(ryujinxSd))
+                    {
+                        DivineDragonSettingsScriptableObject.instance.setSDCardPath(ryujinxSd);
+                        sdPathField.value = ryujinxSd;
+                        Debug.Log("Set the SD path to " +
+                                  DivineDragonSettingsScriptableObject.instance.getSDCardPath());
+                        // Show a unity popup that we've set the path
+                        EditorUtility.DisplayDialog("Success",
+                            "Set the SD path to " + DivineDragonSettingsScriptableObject.instance.getSDCardPath(),
+                            "OK");
+                    }
+                    else
+                    {
+                        Debug.Log("Ryujinx path not found");
+                        EditorUtility.DisplayDialog("Error",
+                            "Ryujinx path not found - did you modify your setup somehow?", "OK");
+                    }
                 }
 
                 if (platform == RuntimePlatform.OSXEditor)
