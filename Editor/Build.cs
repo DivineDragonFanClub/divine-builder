@@ -11,17 +11,17 @@ namespace DivineDragon
 {
     public class Build
     {
-        [MenuItem("Divine Dragon/Build Addressables")]
+        [MenuItem("Divine Dragon/Build")]
         public static void BuildAddressables()
         {
             BuildAddressableContent();
         }
         
-        [MenuItem("Divine Dragon/Build Addressables", true)]
+        [MenuItem("Divine Dragon/Build", true)]
         static bool ValidateBuildAddressables()
         {
-            // Return false if no bundle output path is set
-            return !string.IsNullOrEmpty(DivineDragonSettingsScriptableObject.instance.getBundleOutputPath());
+            // Return false if no mod output path is set
+            return !string.IsNullOrEmpty(DivineDragonSettingsScriptableObject.instance.getModPath());
         }
         
         public static bool BuildAddressableContent()
@@ -85,7 +85,7 @@ namespace DivineDragon
             string projectCurrentDir = Directory.GetCurrentDirectory();
             command = Path.GetFullPath(Path.Combine(projectCurrentDir, "Packages/com.divinedragon.builder", command));
  
-            UnityEngine.Debug.Log(string.Format("{0} Run command: {1}", DateTime.Now, command));
+            Debug.Log(string.Format("{0} Run command: {1}", DateTime.Now, command));
  
             ProcessStartInfo ps = new ProcessStartInfo(command);
             using (Process p = new Process())
@@ -113,7 +113,7 @@ namespace DivineDragon
                         string[] lines = output.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
                         foreach (string line in lines)
                         {
-                            UnityEngine.Debug.Log(string.Format("{0} Output: {1}", DateTime.Now, line));
+                            Debug.Log(string.Format("{0} Output: {1}", DateTime.Now, line));
                         }
                     }
  
@@ -124,7 +124,7 @@ namespace DivineDragon
                         string[] lines = errors.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
                         foreach (string line in lines)
                         {
-                            UnityEngine.Debug.Log(string.Format("{0} Output: {1}", DateTime.Now, line));
+                            Debug.Log(string.Format("{0} Output: {1}", DateTime.Now, line));
                         }
                     }
                 }

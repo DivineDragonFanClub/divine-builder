@@ -1,10 +1,7 @@
 using System;
 using System.IO;
-using System.Net.Mime;
 using UnityEditor;
-using UnityEditor.UIElements;
 using UnityEngine;
-using UnityEngine.Serialization;
 using UnityEngine.UIElements;
 
 namespace DivineDragon
@@ -14,56 +11,41 @@ namespace DivineDragon
     {
         // Path to our mods
         public string engageModsPath = "engage/mods";
-            
-        [SerializeField]
-        string bundleOutputPath;
 
-        [SerializeField] 
-        string sdPath;
+        [SerializeField] string sdPath;
 
-        [SerializeField] 
-        string modPath;
+        [SerializeField] string modPath;
 
         [SerializeField] private bool openAfterBuildCheckbox;
-        
-        public String getBundleOutputPath()
-        {
-            return bundleOutputPath;
-        }
-        
+
         public void setOpenAfterBuild(bool openAfterBuild)
         {
             openAfterBuildCheckbox = openAfterBuild;
             Save(true);
         }
-        
+
         public bool getOpenAfterBuild()
         {
             return openAfterBuildCheckbox;
         }
-        public void setBundleOutputPath(string path)
-        {
-            bundleOutputPath = path;
-            Save(true);
-        }
-        
+
         public void setSDCardPath(string path)
         {
             sdPath = path;
             Save(true);
         }
-        
+
         public string getSDCardPath()
         {
             return sdPath;
         }
-        
+
         public void setModPath(string path)
         {
             modPath = path;
             Save(true);
         }
-        
+
         public string getModPath()
         {
             return modPath;
@@ -75,9 +57,9 @@ namespace DivineDragon
     /// </summary>
     public class SettingsWindow : EditorWindow
     {
-        private TextField bundleOutputPathField;
         private TextField sdPathField;
         private TextField modPathField;
+        private Label buildStatusLabel;
 
         [MenuItem("Divine Dragon/Divine Dragon Window")]
         public static void ShowSettings()
@@ -99,16 +81,14 @@ namespace DivineDragon
             VisualElement divineWindow = visualTree.CloneTree();
             root.Add(divineWindow);
 
-            InitializeBundleOutputField(divineWindow);
-            InitializeBrowseButton(divineWindow);
-            InitializeOpenOutputButton(divineWindow);
-            InitializeBuildButton(divineWindow);
             InitializeOpenAfterBuildCheckbox(divineWindow);
             InitializeBrowseSDButton(divineWindow);
             InitializeSDCardField(divineWindow);
             InitializeBrowseModButton(divineWindow);
             InitializeModField(divineWindow);
             InitializeAutodetectRyujinxButton(divineWindow);
+            InitializeBuildButton(divineWindow);
+            InitializeBuildStatusLabel(divineWindow);
         }
 
         private void InitializeOpenAfterBuildCheckbox(VisualElement divineWindow)
@@ -119,40 +99,6 @@ namespace DivineDragon
             {
                 DivineDragonSettingsScriptableObject.instance.setOpenAfterBuild(evt.newValue);
             });
-        }
-
-        private void InitializeBundleOutputField(VisualElement divineWindow)
-        {
-            TextField bundleOutputField = divineWindow.Q<TextField>("BundleOutputField");
-
-            bundleOutputPathField = bundleOutputField;
-            bundleOutputField.value = DivineDragonSettingsScriptableObject.instance.getBundleOutputPath();
-
-            // reflect edits of the field back to the scriptable object
-            bundleOutputField.RegisterValueChangedCallback(evt =>
-            {
-                DivineDragonSettingsScriptableObject.instance.setBundleOutputPath(evt.newValue);
-            });
-        }
-
-        private void InitializeBrowseButton(VisualElement divineWindow)
-        {
-            Button browseButton = divineWindow.Q<Button>("BrowseOutputPath");
-
-            browseButton.clickable.clicked += () =>
-            {
-                var outputPath = EditorUtility.OpenFolderPanel("Choose a folder to save the output to", "", "");
-                if (string.IsNullOrEmpty(outputPath))
-                {
-                    Debug.Log("no path to output?");
-                    return;
-                }
-
-                DivineDragonSettingsScriptableObject.instance.setBundleOutputPath(outputPath);
-                bundleOutputPathField.value = outputPath;
-                Debug.Log("Set the output path to " +
-                          DivineDragonSettingsScriptableObject.instance.getBundleOutputPath());
-            };
         }
 
         private void InitializeSDCardField(VisualElement divineWindow)
@@ -196,24 +142,26 @@ namespace DivineDragon
                     Debug.Log("No SD card path was chosen");
                     return;
                 }
-                
+
                 // Check if engage/mods already exists in the sd card path
                 // If not, prompt the user if they would like it to be made
-                if (!Directory.Exists(Path.Combine(outputPath, DivineDragonSettingsScriptableObject.instance.engageModsPath)))
+                if (!Directory.Exists(Path.Combine(outputPath,
+                        DivineDragonSettingsScriptableObject.instance.engageModsPath)))
                 {
                     bool createEngageMods = EditorUtility.DisplayDialog("Create engage/mods?",
                         "The engage/mods folder does not exist in the chosen path. Would you like to create it?",
                         "Yes", "No");
                     if (createEngageMods)
                     {
-                        Directory.CreateDirectory(Path.Combine(outputPath, DivineDragonSettingsScriptableObject.instance.engageModsPath));
+                        Directory.CreateDirectory(Path.Combine(outputPath,
+                            DivineDragonSettingsScriptableObject.instance.engageModsPath));
                     }
                     else
                     {
                         Debug.Log("No engage/mods folder was created");
                     }
                 }
-                
+
                 DivineDragonSettingsScriptableObject.instance.setSDCardPath(outputPath);
                 sdPathField.value = outputPath;
                 Debug.Log("Set the SD path to " + DivineDragonSettingsScriptableObject.instance.getSDCardPath());
@@ -244,31 +192,19 @@ namespace DivineDragon
         }
 
 
-        private void InitializeOpenOutputButton(VisualElement divineWindow)
-        {
-            Button openOutputButton = divineWindow.Q<Button>("OpenOutputPath");
-
-            openOutputButton.clickable.clicked += () =>
-            {
-                EditorUtility.OpenWithDefaultApp(
-                    DivineDragonSettingsScriptableObject.instance.getBundleOutputPath());
-            };
-        }
-
         private void InitializeBuildButton(VisualElement divineWindow)
         {
             Button buildButton = divineWindow.Q<Button>("BuildAddressablesDivine");
 
-            buildButton.clickable.clicked += () =>
-            {
-                if (String.IsNullOrEmpty(DivineDragonSettingsScriptableObject.instance.getBundleOutputPath()))
-                {
-                    EditorUtility.DisplayDialog("Error", "No output path set - please set one in this window", "OK");
-                    return;
-                }
+            buildButton.SetEnabled(!String.IsNullOrEmpty(DivineDragonSettingsScriptableObject.instance.getModPath()));
 
-                Build.BuildAddressableContent();
-            };
+            buildButton.clickable.clicked += () => { Build.BuildAddressableContent(); };
+
+            modPathField.RegisterValueChangedCallback(evt =>
+            {
+                Debug.Log("hello");
+                buildButton.SetEnabled(!String.IsNullOrEmpty(evt.newValue));
+            });
         }
 
         private void InitializeAutodetectRyujinxButton(VisualElement divineWindow)
@@ -283,22 +219,28 @@ namespace DivineDragon
                 {
                     Debug.Log("handle windows");
                 }
+
                 if (platform == RuntimePlatform.OSXEditor)
                 {
                     // Check if the standard Ryujinx path exists
-                    var ryujinxSd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library/Application Support/Ryujinx/sdcard");
+                    var ryujinxSd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                        "Library/Application Support/Ryujinx/sdcard");
                     if (Directory.Exists(ryujinxSd))
                     {
                         DivineDragonSettingsScriptableObject.instance.setSDCardPath(ryujinxSd);
                         sdPathField.value = ryujinxSd;
-                        Debug.Log("Set the SD path to " + DivineDragonSettingsScriptableObject.instance.getSDCardPath());
+                        Debug.Log("Set the SD path to " +
+                                  DivineDragonSettingsScriptableObject.instance.getSDCardPath());
                         // Show a unity popup that we've set the path
-                        EditorUtility.DisplayDialog("Success", "Set the SD path to " + DivineDragonSettingsScriptableObject.instance.getSDCardPath(), "OK");
+                        EditorUtility.DisplayDialog("Success",
+                            "Set the SD path to " + DivineDragonSettingsScriptableObject.instance.getSDCardPath(),
+                            "OK");
                     }
                     else
                     {
                         Debug.Log("Ryujinx path not found");
-                        EditorUtility.DisplayDialog("Error", "Ryujinx path not found - did you modify your setup somehow?", "OK");
+                        EditorUtility.DisplayDialog("Error",
+                            "Ryujinx path not found - did you modify your setup somehow?", "OK");
                     }
                 }
 
@@ -307,7 +249,53 @@ namespace DivineDragon
                     Debug.Log("sorry linux users");
                 }
             };
+        }
 
+        private void InitializeBuildStatusLabel(VisualElement divineWindow)
+        {
+            buildStatusLabel = divineWindow.Q<Label>("buildStatusLabel");
+
+            // Initial update
+            UpdateBuildStatus();
+
+            // Register callbacks
+            sdPathField.RegisterValueChangedCallback(evt => UpdateBuildStatus());
+            modPathField.RegisterValueChangedCallback(evt => UpdateBuildStatus());
+        }
+
+        private void UpdateBuildStatus()
+        {
+            SetFieldBorderColorAndWidth(sdPathField, Color.black, 0);
+            SetFieldBorderColorAndWidth(modPathField, Color.black, 0);
+            if (string.IsNullOrEmpty(sdPathField.value))
+            {
+                buildStatusLabel.text = "Please set the SD path.";
+                buildStatusLabel.style.color = Color.red;
+                SetFieldBorderColorAndWidth(sdPathField, Color.red, 1);
+            }
+            else if (string.IsNullOrEmpty(modPathField.value))
+            {
+                buildStatusLabel.text = "Please set the mod path.";
+                buildStatusLabel.style.color = Color.red;
+                SetFieldBorderColorAndWidth(modPathField, Color.red, 1);
+            }
+            else
+            {
+                buildStatusLabel.text = "Ready to build.";
+                buildStatusLabel.style.color = Color.green;
+            }
+        }
+        
+        private void SetFieldBorderColorAndWidth(TextField field, Color color, float width)
+        {
+            field.style.borderTopColor = color;
+            field.style.borderBottomColor = color;
+            field.style.borderLeftColor = color;
+            field.style.borderRightColor = color;
+            field.style.borderBottomWidth = width;
+            field.style.borderTopWidth = width;
+            field.style.borderLeftWidth = width;
+            field.style.borderRightWidth = width;
         }
     }
 }
