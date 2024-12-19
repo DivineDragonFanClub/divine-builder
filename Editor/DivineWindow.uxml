@@ -1,8 +1,26 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
-    <ui:Label text="After running &quot;Build Addressables&quot;, the Divine Dragon will automatically patch your bundle to be compatible with Engage and put it in the following specified path for quick testing.&#10;&#10;This path should have no escape sequences.&#10;&#10;If you are testing on Ryujinx, the following is what you should set your path to be:&#10;&#10;&lt;your Ryujinx path&gt;/sdcard/engage/mods/&lt;your mod name&gt;/Data/StreamingAssets/aa/Switch&#10;" display-tooltip-when-elided="true" name="Readme" style="overflow: visible; flex-wrap: nowrap; flex-basis: auto; white-space: normal; margin-left: 3px; margin-right: 3px; margin-top: 10px; margin-bottom: 3px;" />
-    <ui:TextField picking-mode="Ignore" label="Bundle Output Path" name="BundleOutputField" usage-hints="None" tooltip="Enter a path directly" binding-path="bundleOutputPath" />
-    <ui:Button text="Browse for output path" display-tooltip-when-elided="true" name="BrowseOutputPath" />
-    <ui:Button text="Open output path" display-tooltip-when-elided="true" name="OpenOutputPath" tooltip="Verify that you set the right path" style="margin-bottom: 10px;" />
-    <ui:Toggle label="Open output folder after build" name="openAfterBuildCheckbox" />
-    <ui:Button text="Build Addressables and Patch Bundles" display-tooltip-when-elided="true" name="BuildAddressablesDivine" />
+    <ui:VisualElement name="Root" style="justify-content: flex-start; width: 100%; height: 100%; padding-left: 3px; padding-right: 3px; padding-top: 3px; padding-bottom: 3px;">
+        <ui:Label text="The Divine Dragon will automatically patch your bundles to be compatible with Engage, and then move them into your mod for quick testing." display-tooltip-when-elided="true" name="Readme" style="overflow: visible; flex-wrap: nowrap; flex-basis: auto; white-space: normal; margin-left: 3px; margin-right: 3px; margin-top: 10px; margin-bottom: 10px; height: auto; width: auto;" />
+        <ui:VisualElement name="sdcardpathContainer" style="flex-direction: column; margin-left: 3px; margin-right: 3px; margin-top: 1px; margin-bottom: 10px;">
+            <ui:Label text="sdcard Path" display-tooltip-when-elided="true" name="sdlabel" style="margin-bottom: 5px; font-size: 16px;" />
+            <ui:TextField picking-mode="Ignore" name="SDCardField" usage-hints="None" tooltip="The SD Card path is needed to help locate your engage/mods folder." binding-path="sdCardPath" style="min-width: 50%; margin-top: 0; margin-left: 0; margin-right: 0; margin-bottom: 0;" />
+            <ui:VisualElement name="buttonContainer" style="flex-direction: row; margin-top: 5px; justify-content: flex-end; align-items: auto; width: 100%;">
+                <ui:Button text="Autodetect Path for Ryujinx" display-tooltip-when-elided="true" name="AutodetectRyujinx" tooltip="Attempt to autodetect your Ryujinx sdcard" style="margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0; align-items: auto; white-space: normal;" />
+                <ui:Button text="Browse for sdcard path" display-tooltip-when-elided="true" name="BrowseSDPath" style="margin-bottom: 0; align-items: auto; max-width: none; justify-content: flex-start; right: auto; margin-left: 0; margin-right: 0; margin-top: 0; white-space: normal;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="modpathContainer" style="margin-left: 3px; margin-right: 3px; margin-top: 1px; margin-bottom: 10px;">
+            <ui:Label text="Mod Path" display-tooltip-when-elided="true" name="modlabel" style="margin-bottom: 5px; font-size: 16px;" />
+            <ui:TextField picking-mode="Ignore" name="modPathField" usage-hints="None" tooltip="Enter a path directly" binding-path="modPath" style="height: 18px; margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0; border-left-color: rgba(255, 0, 0, 255); border-right-color: rgba(255, 0, 0, 255); border-top-color: rgba(255, 0, 0, 255); border-bottom-color: rgba(255, 0, 0, 255);" />
+            <ui:VisualElement name="buttonContainer" style="align-items: flex-end;">
+                <ui:Button text="Browse for mod path" display-tooltip-when-elided="true" name="BrowseModPath" tooltip="Select the mod folder you want to build to. Zip files are not currently supported." style="margin-bottom: 0; margin-left: 0; margin-right: 0; margin-top: 5px;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="buildContainer" style="bottom: auto; position: relative; width: 100%; margin-left: 3px; margin-right: 3px; margin-top: 1px; margin-bottom: 1px;">
+            <ui:Label text="Build" display-tooltip-when-elided="true" name="BuildLabel" style="margin-bottom: 5px; font-size: 16px;" />
+            <ui:Label text="Ready to build" display-tooltip-when-elided="true" name="buildStatusLabel" style="color: rgb(0, 255, 70); font-size: 14px;" />
+            <ui:Button text="Build" display-tooltip-when-elided="true" name="BuildAddressablesDivine" style="border-left-color: rgb(0, 71, 171); border-right-color: rgb(0, 71, 171); border-top-color: rgb(0, 71, 171); border-bottom-color: rgb(0, 71, 171); margin-bottom: 3px; margin-left: 0; margin-right: 0; margin-top: 0;" />
+            <ui:Toggle label="Open output folder after build" name="openAfterBuildCheckbox" />
+        </ui:VisualElement>
+    </ui:VisualElement>
 </ui:UXML>
