@@ -198,11 +198,15 @@ namespace DivineDragon
 
             buildButton.SetEnabled(!String.IsNullOrEmpty(DivineDragonSettingsScriptableObject.instance.getModPath()));
 
-            buildButton.clickable.clicked += () => { Build.BuildAddressableContent(); };
+            buildButton.clickable.clicked += () =>
+            {
+                Build.BuildAddressableContent();
+                buildStatusLabel.text = "Build complete at " + DateTime.Now + " ✔ (See debug logs for details)";
+                buildStatusLabel.style.color = Color.green;
+            };
 
             modPathField.RegisterValueChangedCallback(evt =>
             {
-                Debug.Log("hello");
                 buildButton.SetEnabled(!String.IsNullOrEmpty(evt.newValue));
             });
         }
@@ -285,7 +289,7 @@ namespace DivineDragon
                 buildStatusLabel.style.color = Color.green;
             }
         }
-        
+
         private void SetFieldBorderColorAndWidth(TextField field, Color color, float width)
         {
             field.style.borderTopColor = color;
