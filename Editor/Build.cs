@@ -2,8 +2,10 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using UnityEditor;
+using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Build;
 using UnityEditor.AddressableAssets.Settings;
+using UnityEditor.AddressableAssets.Settings.GroupSchemas;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
@@ -61,10 +63,16 @@ namespace DivineDragon
             }
             
             RunProcess(bundleTools, false, args);
+            
+            // Remove addressables with the label "removePostBuild"
+            AddressableUtility.RemoveAddressablesWithLabel(outputDirectory, "removePostBuild");
+
             if (DivineDragonSettingsScriptableObject.instance.getOpenAfterBuild())
             {
                 EditorUtility.RevealInFinder(outputDirectory);
             }
+            
+            
 
             return success;
         }
@@ -132,5 +140,39 @@ namespace DivineDragon
         }
 
     }
-    
+    public static class AddressableUtility
+    {
+        public static void RemoveAddressablesWithLabel(string outputDirectory, string label)
+        {
+            var settings = AddressableAssetSettingsDefaultObject.Settings;
+
+            if (settings == null)
+            {
+                Debug.LogError("AddressableAssetSettings not found.");
+                return;
+            }
+
+            foreach (var group in settings.groups)
+            {
+                if (group == null || group.HasSchema<PlayerDataGroupSchema>())
+                    continue;
+
+                var groupPrefix = group.name + "_" + "assets";
+
+                foreach (var entry in group.entries)
+                {
+                    if (entry.labels.Contains(label))
+                    {
+                        var entryPath = groupPrefix + "_" + entry.address.ToLower() + ".bundle";
+                        var filePath = Path.Combine(outputDirectory, entryPath);
+                        if (File.Exists(filePath))
+                        {
+                            File.Delete(filePath);
+                            Debug.Log($"Deleted bundle: {filePath}");
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
