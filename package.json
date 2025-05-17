@@ -1,7 +1,7 @@
 {
   "name": "com.divinedragon.builder",
   "displayName": "Divine Builder",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "unity": "2020.3",
   "description": "Asset building system for Fire Emblem Engage modding."
 }
