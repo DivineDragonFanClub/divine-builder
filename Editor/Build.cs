@@ -25,6 +25,49 @@ namespace DivineDragon
             // Return false if no mod output path is set
             return !string.IsNullOrEmpty(DivineDragonSettingsScriptableObject.instance.getModPath());
         }
+
+        [MenuItem("Divine Dragon/Clean Addressable Paths")]
+        public static void CleanAddressablePaths()
+        {
+            // list all addressable names in the groups
+            var settings = AddressableAssetSettingsDefaultObject.Settings;
+            if (settings == null)
+            {
+                Debug.LogError("AddressableAssetSettings not found.");
+                return;
+            }
+            foreach (var group in settings.groups)
+            {
+                if (group == null || group.HasSchema<PlayerDataGroupSchema>())
+                    continue;
+
+                foreach (var entry in group.entries)
+                {
+                    if (entry == null)
+                        continue;
+
+                    Debug.Log(entry.address);
+                    // if entry has the Assets/Share/Addressables/ prefix, remove it
+                    if (entry.address.StartsWith("Assets/Share/Addressables/"))
+                    {
+                        entry.address = entry.address.Substring("Assets/Share/Addressables/".Length);
+                        Debug.Log("Removed prefix from address: " + entry.address);
+                    }
+                    // Remove common file extensions from addresses - could we always remove anything including/after the last dot?
+                    string[] extensionsToRemove = { ".anim", ".overrideController" };
+                    foreach (var extension in extensionsToRemove)
+                    {
+                        if (entry.address.EndsWith(extension))
+                        {
+                            string oldAddress = entry.address;
+                            entry.address = entry.address.Substring(0, entry.address.Length - extension.Length);
+                            Debug.Log($"Removed {extension} suffix from address: {entry.address}");
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         
         public static bool BuildAddressableContent()
         {
