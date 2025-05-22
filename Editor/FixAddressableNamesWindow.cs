@@ -20,7 +20,7 @@ namespace DivineDragon
         private List<FixedNameInfo> cleanedNames = new List<FixedNameInfo>();
         private bool showDoneMessage = false;
 
-        [MenuItem("Divine Dragon/Fix Addressable Names Tool")]
+        [MenuItem("Divine Dragon/Fix Addressable Names Tool", false, 1010)]
         public static void ShowWindow()
         {
             GetWindow<FixAddressableNamesWindow>("Fix Addressable Names");
