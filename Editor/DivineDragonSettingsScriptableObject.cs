@@ -62,7 +62,7 @@ namespace DivineDragon
         private Label buildStatusLabel;
         private Color cobaltBlue = new Color(0.0f, 0.28f, 0.67f, 1.0f);
 
-        [MenuItem("Divine Dragon/Divine Dragon Window")]
+        [MenuItem("Divine Dragon/Divine Dragon Window #%d", false, 1501)]
         public static void ShowSettings()
         {
             SettingsWindow wnd = GetWindow<SettingsWindow>();
