@@ -13,19 +13,19 @@ namespace DivineDragon
 {
     public class Build
     {
-        [MenuItem("Divine Dragon/Build")]
+        [MenuItem("Divine Dragon/Build", false, 1500)]
         public static void BuildAddressables()
         {
             BuildAddressableContent();
         }
         
-        [MenuItem("Divine Dragon/Build", true)]
+        [MenuItem("Divine Dragon/Build", true, 1500)]
         static bool ValidateBuildAddressables()
         {
             // Return false if no mod output path is set
             return !string.IsNullOrEmpty(DivineDragonSettingsScriptableObject.instance.getModPath());
         }
-        
+
         public static bool BuildAddressableContent()
         {
             AddressableAssetSettings
