@@ -12,8 +12,9 @@
         <ui:VisualElement name="modpathContainer" style="margin-left: 3px; margin-right: 3px; margin-top: 1px; margin-bottom: 10px;">
             <ui:Label text="Mod Path" display-tooltip-when-elided="true" name="modlabel" style="margin-bottom: 5px; font-size: 16px;" />
             <ui:TextField picking-mode="Ignore" name="modPathField" usage-hints="None" tooltip="Enter a path directly" binding-path="modPath" style="height: 18px; margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0; border-left-color: rgba(255, 0, 0, 255); border-right-color: rgba(255, 0, 0, 255); border-top-color: rgba(255, 0, 0, 255); border-bottom-color: rgba(255, 0, 0, 255);" />
-            <ui:VisualElement name="buttonContainer" style="align-items: flex-end;">
-                <ui:Button text="Browse for mod path" display-tooltip-when-elided="true" name="BrowseModPath" tooltip="Select the mod folder you want to build to. Zip files are not currently supported." style="margin-bottom: 0; margin-left: 0; margin-right: 0; margin-top: 5px;" />
+            <ui:VisualElement name="buttonContainer" style="flex-direction: row; margin-top: 5px; justify-content: flex-end;">
+                <ui:Button text="Open mod path" display-tooltip-when-elided="true" name="OpenModPath" tooltip="Open the mod folder in file explorer" style="margin-right: 0; margin-bottom: 0; margin-left: 0; margin-top: 0; white-space: normal;" />
+                <ui:Button text="Browse for mod path" display-tooltip-when-elided="true" name="BrowseModPath" tooltip="Select the mod folder you want to build to. Zip files are not currently supported." style="margin-bottom: 0; margin-left: 0; margin-right: 0; margin-top: 0; white-space: normal;" />
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="buildContainer" style="bottom: auto; position: relative; width: 100%; margin-left: 3px; margin-right: 3px; margin-top: 1px; margin-bottom: 1px;">

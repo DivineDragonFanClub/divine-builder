@@ -3,6 +3,7 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
+using Debug = UnityEngine.Debug;
 
 namespace DivineDragon
 {
@@ -86,6 +87,7 @@ namespace DivineDragon
             InitializeBrowseSDButton(divineWindow);
             InitializeSDCardField(divineWindow);
             InitializeBrowseModButton(divineWindow);
+            InitializeOpenModButton(divineWindow);
             InitializeModField(divineWindow);
             InitializeAutodetectRyujinxButton(divineWindow);
             InitializeBuildButton(divineWindow);
@@ -127,6 +129,7 @@ namespace DivineDragon
             modPathField.RegisterValueChangedCallback(evt =>
             {
                 DivineDragonSettingsScriptableObject.instance.setModPath(evt.newValue);
+                UpdateOpenModButtonVisibility();
             });
         }
 
@@ -188,8 +191,44 @@ namespace DivineDragon
 
                 DivineDragonSettingsScriptableObject.instance.setModPath(outputPath);
                 modPathField.value = outputPath;
+                UpdateOpenModButtonVisibility();
                 Debug.Log("Set the mod path to " + DivineDragonSettingsScriptableObject.instance.getModPath());
             };
+        }
+
+        private Button openModButton;
+        private void InitializeOpenModButton(VisualElement divineWindow)
+        {
+            openModButton = divineWindow.Q<Button>("OpenModPath");
+
+            openModButton.clickable.clicked += () =>
+            {
+                string modPath = DivineDragonSettingsScriptableObject.instance.getModPath();
+                if (!string.IsNullOrEmpty(modPath) && Directory.Exists(modPath))
+                {
+                    // On macOS, use the 'open' command for more reliable folder opening
+                    if (Application.platform == RuntimePlatform.OSXEditor)
+                    {
+                        System.Diagnostics.Process.Start("open", $"\"{modPath}\"");
+                    }
+                    else
+                    {
+                        EditorUtility.RevealInFinder(modPath);
+                    }
+                }
+            };
+
+            // Initial visibility update
+            UpdateOpenModButtonVisibility();
+        }
+
+        private void UpdateOpenModButtonVisibility()
+        {
+            if (openModButton == null) return;
+            
+            string modPath = DivineDragonSettingsScriptableObject.instance.getModPath();
+            bool shouldShow = !string.IsNullOrEmpty(modPath) && Directory.Exists(modPath);
+            openModButton.style.display = shouldShow ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         private Button buildButton;
