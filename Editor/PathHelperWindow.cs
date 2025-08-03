@@ -72,29 +72,60 @@ namespace DivineDragon
             if (selectedPrefab == null) return;
             
             string prefabName = selectedPrefab.name;
-            if (prefabName.StartsWith("uBody_"))
+            ParseModelInput(prefabName, out PathMode? detectedMode, out string extractedModel, out string extractedCharId);
+            
+            if (detectedMode.HasValue)
             {
-                currentMode = PathMode.DressModel;
-                string[] parts = prefabName.Split('_');
-                if (parts.Length >= 2)
+                currentMode = detectedMode.Value;
+                modelName = extractedModel;
+                characterId = extractedCharId;
+            }
+        }
+        
+        private void ParseModelInput(string input, out PathMode? detectedMode, out string extractedModelName, out string extractedCharId)
+        {
+            detectedMode = null;
+            extractedModelName = input;
+            extractedCharId = "";
+            
+            if (string.IsNullOrEmpty(input)) return;
+            
+            // Check for uBody_ or oBody_ prefix
+            bool hasUBodyPrefix = input.StartsWith("uBody_");
+            bool hasOBodyPrefix = input.StartsWith("oBody_");
+            
+            if (hasUBodyPrefix || hasOBodyPrefix)
+            {
+                detectedMode = hasUBodyPrefix ? PathMode.DressModel : PathMode.BodyModel;
+                
+                // Remove the prefix
+                string withoutPrefix = input.Substring(6); // "uBody_" or "oBody_" is 6 chars
+                
+                // Check for character ID suffix pattern (_c### at the end)
+                var match = System.Text.RegularExpressions.Regex.Match(withoutPrefix, @"^(.+?)(?:_(c\d{3}))?$");
+                if (match.Success)
                 {
-                    modelName = parts[1];
-                    if (parts.Length >= 3)
+                    extractedModelName = match.Groups[1].Value;
+                    if (match.Groups[2].Success)
                     {
-                        characterId = parts[2];
+                        extractedCharId = match.Groups[2].Value;
                     }
                 }
-            }
-            else if (prefabName.StartsWith("oBody_"))
-            {
-                currentMode = PathMode.BodyModel;
-                string[] parts = prefabName.Split('_');
-                if (parts.Length >= 2)
+                else
                 {
-                    modelName = parts[1];
-                    if (parts.Length >= 3)
+                    extractedModelName = withoutPrefix;
+                }
+            }
+            else
+            {
+                // No prefix found, check if there's a character ID suffix
+                var match = System.Text.RegularExpressions.Regex.Match(input, @"^(.+?)(?:_(c\d{3}))?$");
+                if (match.Success)
+                {
+                    extractedModelName = match.Groups[1].Value;
+                    if (match.Groups[2].Success)
                     {
-                        characterId = parts[2];
+                        extractedCharId = match.Groups[2].Value;
                     }
                 }
             }
@@ -146,7 +177,34 @@ namespace DivineDragon
             selectedPrefab = (GameObject)EditorGUILayout.ObjectField("Prefab", selectedPrefab, typeof(GameObject), false);
             GUILayout.Space(3);
             
+            string previousModelName = modelName;
             modelName = EditorGUILayout.TextField("Model Name", modelName);
+            
+            // Smart parsing when model name changes
+            if (modelName != previousModelName && !string.IsNullOrEmpty(modelName))
+            {
+                ParseModelInput(modelName, out PathMode? detectedMode, out string extractedModel, out string extractedCharId);
+                
+                if (detectedMode.HasValue)
+                {
+                    // Auto-switch mode if a prefix was detected
+                    currentMode = detectedMode.Value;
+                    modelName = extractedModel;
+                    
+                    // Only update character ID if one was found
+                    if (!string.IsNullOrEmpty(extractedCharId))
+                    {
+                        characterId = extractedCharId;
+                    }
+                }
+                else if (!string.IsNullOrEmpty(extractedCharId))
+                {
+                    // Even without prefix, if we found a character ID, extract it
+                    modelName = extractedModel;
+                    characterId = extractedCharId;
+                }
+            }
+            
             GUILayout.Space(3);
             
             // Character ID with placeholder and tooltip
