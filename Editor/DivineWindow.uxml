@@ -21,6 +21,7 @@
             <ui:Label text="Build" display-tooltip-when-elided="true" name="BuildLabel" style="margin-bottom: 5px; font-size: 16px;" />
             <ui:Label text="Ready to build" display-tooltip-when-elided="true" name="buildStatusLabel" style="color: rgb(0, 255, 70); font-size: 14px;" />
             <ui:Button text="Build" display-tooltip-when-elided="true" name="BuildAddressablesDivine" style="border-left-color: rgb(0, 71, 171); border-right-color: rgb(0, 71, 171); border-top-color: rgb(0, 71, 171); border-bottom-color: rgb(0, 71, 171); margin-bottom: 3px; margin-left: 0; margin-right: 0; margin-top: 0;" />
+            <ui:Toggle label="Run pre-build checks" name="runPreBuildChecksCheckbox" tooltip="Run validation checks before building and show issues if found" />
             <ui:Toggle label="Open output folder after build" name="openAfterBuildCheckbox" />
         </ui:VisualElement>
     </ui:VisualElement>

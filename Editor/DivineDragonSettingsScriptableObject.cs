@@ -18,6 +18,7 @@ namespace DivineDragon
         [SerializeField] string modPath;
 
         [SerializeField] private bool openAfterBuildCheckbox;
+        [SerializeField] private bool runPreBuildChecks = true;
 
         public void setOpenAfterBuild(bool openAfterBuild)
         {
@@ -28,6 +29,17 @@ namespace DivineDragon
         public bool getOpenAfterBuild()
         {
             return openAfterBuildCheckbox;
+        }
+        
+        public void setRunPreBuildChecks(bool runChecks)
+        {
+            runPreBuildChecks = runChecks;
+            Save(true);
+        }
+        
+        public bool getRunPreBuildChecks()
+        {
+            return runPreBuildChecks;
         }
 
         public void setSDCardPath(string path)
@@ -84,6 +96,7 @@ namespace DivineDragon
             root.Add(divineWindow);
 
             InitializeOpenAfterBuildCheckbox(divineWindow);
+            InitializeRunPreBuildChecksCheckbox(divineWindow);
             InitializeBrowseSDButton(divineWindow);
             InitializeSDCardField(divineWindow);
             InitializeBrowseModButton(divineWindow);
@@ -101,6 +114,16 @@ namespace DivineDragon
             openAfterBuildCheckbox.RegisterValueChangedCallback(evt =>
             {
                 DivineDragonSettingsScriptableObject.instance.setOpenAfterBuild(evt.newValue);
+            });
+        }
+        
+        private void InitializeRunPreBuildChecksCheckbox(VisualElement divineWindow)
+        {
+            Toggle runPreBuildChecksCheckbox = divineWindow.Q<Toggle>("runPreBuildChecksCheckbox");
+            runPreBuildChecksCheckbox.value = DivineDragonSettingsScriptableObject.instance.getRunPreBuildChecks();
+            runPreBuildChecksCheckbox.RegisterValueChangedCallback(evt =>
+            {
+                DivineDragonSettingsScriptableObject.instance.setRunPreBuildChecks(evt.newValue);
             });
         }
 

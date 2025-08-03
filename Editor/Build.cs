@@ -28,6 +28,34 @@ namespace DivineDragon
 
         public static bool BuildAddressableContent()
         {
+            // Check if pre-build checks are enabled
+            if (DivineDragonSettingsScriptableObject.instance.getRunPreBuildChecks())
+            {
+                // Run pre-flight checks
+                var issues = PreFlightCheck.PreFlightCheckManager.RunAllChecks();
+                
+                if (issues.Count > 0)
+                {
+                    // Show issues window
+                    PreFlightCheck.BuildIssuesWindow.ShowWithIssues(issues);
+                    
+                    // Always block build when checks are enabled and issues found
+                    Debug.LogError($"Build cancelled. Found {issues.Count} issues during pre-build checks. Please check the Build Issues window.");
+                    EditorUtility.DisplayDialog("Pre-Build Check Failed", 
+                        $"Found {issues.Count} issues during pre-build checks.\n\nPlease check the Build Issues window and fix the issues before building.", 
+                        "OK");
+                    return false;
+                }
+                else
+                {
+                    Debug.Log("Pre-flight checks passed. No issues found.");
+                }
+            }
+            else
+            {
+                Debug.Log("Pre-build checks are disabled. Skipping validation.");
+            }
+            
             AddressableAssetSettings
                 .BuildPlayerContent(out AddressablesPlayerBuildResult result);
             bool success = string.IsNullOrEmpty(result.Error);
