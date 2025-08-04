@@ -37,7 +37,7 @@ namespace DivineDragon.PreFlightCheck
             
             if (issues.Any(i => i.Rule.CanAutoFix))
             {
-                if (GUILayout.Button("Fix All", EditorStyles.toolbarButton, GUILayout.Width(80)))
+                if (GUILayout.Button("Autofix All", EditorStyles.toolbarButton, GUILayout.Width(100)))
                 {
                     FixAllIssues();
                 }
@@ -90,7 +90,7 @@ namespace DivineDragon.PreFlightCheck
                 headerStyle.fontSize = 12;
                 EditorGUILayout.LabelField($"{rule.Name} ({ruleIssues.Count} issues)", headerStyle);
                 
-                if (rule.CanAutoFix && GUILayout.Button("Fix All", GUILayout.Width(60)))
+                if (rule.CanAutoFix && GUILayout.Button("Autofix All", GUILayout.Width(80)))
                 {
                     FixIssuesForRule(ruleIssues);
                 }
@@ -129,12 +129,31 @@ namespace DivineDragon.PreFlightCheck
             // Issue details
             EditorGUILayout.BeginVertical();
             
+            // Asset path with open button
+            EditorGUILayout.BeginHorizontal();
+            
             // Asset path as clickable link
-            if (GUILayout.Button(issue.AssetPath, EditorStyles.linkLabel))
+            var linkStyle = new GUIStyle(EditorStyles.linkLabel);
+            var rect = GUILayoutUtility.GetRect(new GUIContent(issue.AssetPath), linkStyle, GUILayout.Height(16));
+            
+            // Add cursor change on hover
+            if (rect.Contains(Event.current.mousePosition))
             {
-                Selection.activeObject = issue.Asset;
-                EditorGUIUtility.PingObject(issue.Asset);
+                EditorGUIUtility.AddCursorRect(rect, MouseCursor.Link);
             }
+            
+            if (GUI.Button(rect, issue.AssetPath, linkStyle))
+            {
+                OpenIssueAsset(issue);
+            }
+            
+            // Small open button with arrow after the path
+            if (GUILayout.Button("→", GUILayout.Width(20), GUILayout.Height(16)))
+            {
+                OpenIssueAsset(issue);
+            }
+            
+            EditorGUILayout.EndHorizontal();
             
             EditorGUILayout.LabelField(issue.Message, EditorStyles.wordWrappedMiniLabel);
             EditorGUILayout.EndVertical();
@@ -142,7 +161,7 @@ namespace DivineDragon.PreFlightCheck
             // Fix button
             if (issue.Rule.CanAutoFix)
             {
-                if (GUILayout.Button("Fix", GUILayout.Width(40)))
+                if (GUILayout.Button("Autofix", GUILayout.Width(60)))
                 {
                     if (issue.Rule.AutoFix(issue))
                     {
@@ -196,6 +215,29 @@ namespace DivineDragon.PreFlightCheck
         {
             issues = PreFlightCheckManager.RunAllChecks();
             Repaint();
+        }
+        
+        private void OpenIssueAsset(BuildIssue issue)
+        {
+            // If we have a specific component, open the prefab and select it
+            if (issue.SpecificComponent != null && issue.Asset is GameObject)
+            {
+                // Open the prefab in prefab mode
+                AssetDatabase.OpenAsset(issue.Asset);
+                
+                // Wait a frame for the prefab to open, then select the component
+                EditorApplication.delayCall += () =>
+                {
+                    Selection.activeObject = issue.SpecificComponent;
+                    EditorGUIUtility.PingObject(issue.SpecificComponent);
+                };
+            }
+            else
+            {
+                // Just select the asset
+                Selection.activeObject = issue.Asset;
+                EditorGUIUtility.PingObject(issue.Asset);
+            }
         }
     }
 }

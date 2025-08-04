@@ -15,14 +15,16 @@ namespace DivineDragon.PreFlightCheck
         public string AssetPath { get; set; }
         public string Message { get; set; }
         public Object Asset { get; set; }
+        public Object SpecificComponent { get; set; } // The specific component/object with the issue
         public IssueSeverity Severity { get; set; }
         public BuildRule Rule { get; set; }
         
-        public BuildIssue(string assetPath, string message, Object asset, IssueSeverity severity, BuildRule rule)
+        public BuildIssue(string assetPath, string message, Object asset, IssueSeverity severity, BuildRule rule, Object specificComponent = null)
         {
             AssetPath = assetPath;
             Message = message;
             Asset = asset;
+            SpecificComponent = specificComponent;
             Severity = severity;
             Rule = rule;
         }

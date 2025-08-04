@@ -93,10 +93,12 @@ namespace DivineDragon.PreFlightCheck
                                 var issue = new BuildIssue(
                                     assetPath,
                                     $"Material '{material.name}' on SkinnedMeshRenderer '{renderer.name}' uses shader '{shader.name}' which is not addressable. " +
-                                    $"All shaders must be addressable to be included in the build.",
+                                    "This will cause a build error. " +
+                                    $"Make sure to use a shader from the game and mark the shader as addressable.",
                                     prefab,
                                     DefaultSeverity,
-                                    this
+                                    this,
+                                    renderer // Pass the specific component
                                 );
                                 issues.Add(issue);
                             }

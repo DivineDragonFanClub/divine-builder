@@ -38,7 +38,8 @@ namespace DivineDragon.PreFlightCheck
                             $"SkinnedMeshRenderer on '{renderer.name}' does not have 'Update When Offscreen' enabled",
                             prefab,
                             DefaultSeverity,
-                            this
+                            this,
+                            renderer // Pass the specific component
                         );
                         issues.Add(issue);
                     }
