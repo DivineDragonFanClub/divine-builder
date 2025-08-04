@@ -11,8 +11,9 @@ namespace DivineDragon.PreFlightCheck
     {
         private static readonly List<BuildRule> Rules = new List<BuildRule>
         {
-            new SkinnedMeshRendererRule()
-            // Add more rules here as needed
+            new SkinnedMeshRendererRule(),
+            new PrefabOverridesInScenesRule(),
+            new AddressableShaderRule()
         };
 
         public static List<BuildIssue> RunAllChecks()
@@ -50,6 +51,16 @@ namespace DivineDragon.PreFlightCheck
                             allIssues.AddRange(issues);
                         }
                     }
+                }
+            }
+            
+            // Run special checks that don't iterate through addressables (like scene checks)
+            foreach (var rule in Rules)
+            {
+                if (rule.AppliesTo("SCENE_CHECK", null))
+                {
+                    var issues = rule.Validate("SCENE_CHECK", null);
+                    allIssues.AddRange(issues);
                 }
             }
             
