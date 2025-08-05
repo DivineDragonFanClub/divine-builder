@@ -13,7 +13,8 @@ namespace DivineDragon.PreFlightCheck
         {
             new SkinnedMeshRendererRule(),
             new PrefabOverridesInScenesRule(),
-            new AddressableShaderRule()
+            new AddressableShaderRule(),
+            new OBodyAvatarRule()
         };
 
         public static List<BuildIssue> RunAllChecks()
