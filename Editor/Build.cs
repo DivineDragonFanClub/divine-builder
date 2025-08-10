@@ -37,12 +37,12 @@ namespace DivineDragon
                 if (issues.Count > 0)
                 {
                     // Show issues window
-                    PreFlightCheck.BuildIssuesWindow.ShowWithIssues(issues);
+                    PreFlightCheck.PreflightCheckWindow.ShowWithIssues(issues);
                     
                     // Always block build when checks are enabled and issues found
-                    Debug.LogError($"Build cancelled. Found {issues.Count} issues during pre-build checks. Please check the Build Issues window.");
+                    Debug.LogError($"Build cancelled. Found {issues.Count} issues during pre-build checks. Please check the Preflight Check window.");
                     EditorUtility.DisplayDialog("Pre-Build Check Failed", 
-                        $"Found {issues.Count} issues during pre-build checks.\n\nPlease check the Build Issues window and fix the issues before building.", 
+                        $"Found {issues.Count} issues during pre-build checks.\n\nPlease check the Preflight Check window and fix the issues before building.", 
                         "OK");
                     return false;
                 }
