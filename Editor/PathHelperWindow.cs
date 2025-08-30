@@ -13,6 +13,16 @@ namespace DivineDragon
             DressModel,
             BodyModel
         }
+        
+        private enum ValidationState
+        {
+            Ready,                      // Ready to move and set addressable
+            NeedsAddressableOnly,       // File in correct location, just needs addressable update
+            WillReplace,                // Will replace existing file at target
+            AddressableConflict,        // Addressable path already used by another asset
+            AlreadyCorrect,            // Everything is already correct
+            Invalid                    // Missing required inputs
+        }
 
         private PathMode currentMode = PathMode.DressModel;
         private GameObject selectedPrefab;
@@ -22,7 +32,7 @@ namespace DivineDragon
         private string previewFilename = "";
         private string previewTargetPath = "";
         private string previewAddressablePath = "";
-        private bool isValid = false;
+        private ValidationState validationState = ValidationState.Invalid;
         private string validationMessage = "";
         private bool showTechnicalDetails = false;
         private bool showSuccess = false;
@@ -278,9 +288,11 @@ namespace DivineDragon
             if (!string.IsNullOrEmpty(validationMessage))
             {
                 MessageType messageType = MessageType.Info;
-                if (validationMessage.StartsWith("Warning:"))
+                if (validationState == ValidationState.AddressableConflict || validationState == ValidationState.AlreadyCorrect)
                     messageType = MessageType.Warning;
-                else if (!isValid)
+                else if (validationState == ValidationState.WillReplace)
+                    messageType = MessageType.Warning;
+                else if (validationState == ValidationState.Invalid)
                     messageType = MessageType.Warning;
                 
                 EditorGUILayout.HelpBox(validationMessage, messageType);
@@ -300,8 +312,13 @@ namespace DivineDragon
             }
             else
             {
-                EditorGUI.BeginDisabledGroup(!isValid);
-                if (GUILayout.Button("Execute", GUILayout.Height(30)))
+                bool canExecute = validationState == ValidationState.Ready || 
+                                 validationState == ValidationState.NeedsAddressableOnly || 
+                                 validationState == ValidationState.WillReplace;
+                
+                EditorGUI.BeginDisabledGroup(!canExecute);
+                string buttonText = validationState == ValidationState.NeedsAddressableOnly ? "Update Addressable" : "Execute";
+                if (GUILayout.Button(buttonText, GUILayout.Height(30)))
                 {
                     Execute();
                 }
@@ -318,7 +335,7 @@ namespace DivineDragon
 
         private void UpdatePreview()
         {
-            isValid = false;
+            validationState = ValidationState.Invalid;
             validationMessage = "";
             
             if (selectedPrefab == null)
@@ -350,49 +367,82 @@ namespace DivineDragon
             bool fileExists = File.Exists(targetFullPath);
             string currentPath = AssetDatabase.GetAssetPath(selectedPrefab);
             
-            // Check if addressable path is already taken
-            bool addressableExists = false;
-            string existingAssetPath = "";
+            // Check addressable status
             var settings = AddressableAssetSettingsDefaultObject.Settings;
+            bool addressableConflict = false;
+            string conflictingAssetPath = "";
+            string currentAddressablePath = "";
+            bool hasAddressableEntry = false;
+            
             if (settings != null)
             {
+                // Check if current prefab has an addressable entry
+                string currentGuid = AssetDatabase.AssetPathToGUID(currentPath);
+                foreach (var group in settings.groups)
+                {
+                    var currentEntry = group.GetAssetEntry(currentGuid);
+                    if (currentEntry != null)
+                    {
+                        currentAddressablePath = currentEntry.address;
+                        hasAddressableEntry = true;
+                        break;
+                    }
+                }
+                
+                // Check if the desired addressable path is taken by another asset
                 foreach (var group in settings.groups)
                 {
                     foreach (var entry in group.entries)
                     {
                         if (entry.address == previewAddressablePath)
                         {
-                            existingAssetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
-                            if (existingAssetPath != currentPath && existingAssetPath != targetFullPath)
+                            string assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
+                            if (assetPath != currentPath && assetPath != targetFullPath)
                             {
-                                addressableExists = true;
+                                addressableConflict = true;
+                                conflictingAssetPath = assetPath;
                                 break;
                             }
                         }
                     }
-                    if (addressableExists) break;
+                    if (addressableConflict) break;
                 }
             }
             
-            // Determine validation status
-            if (currentPath == targetFullPath)
+            // Determine validation state
+            bool isInCorrectLocation = (currentPath == targetFullPath);
+            bool hasCorrectAddressable = hasAddressableEntry && (currentAddressablePath == previewAddressablePath);
+            
+            if (addressableConflict)
             {
-                validationMessage = "This prefab is already in the correct location";
-                isValid = false;
+                validationState = ValidationState.AddressableConflict;
+                validationMessage = $"Warning: Addressable path already used by: {Path.GetFileName(conflictingAssetPath)}";
             }
-            else if (addressableExists)
+            else if (isInCorrectLocation && hasCorrectAddressable)
             {
-                validationMessage = $"Warning: Addressable path already used by: {Path.GetFileName(existingAssetPath)}";
-                isValid = false; // Don't allow duplicate addressable paths
+                validationState = ValidationState.AlreadyCorrect;
+                validationMessage = "This prefab is already in the correct location with correct addressable path";
+            }
+            else if (isInCorrectLocation && !hasCorrectAddressable)
+            {
+                validationState = ValidationState.NeedsAddressableOnly;
+                if (!hasAddressableEntry)
+                {
+                    validationMessage = "Prefab is in correct location but needs addressable path set";
+                }
+                else
+                {
+                    validationMessage = $"Prefab is in correct location but addressable path needs updating from:\n{currentAddressablePath}";
+                }
             }
             else if (fileExists)
             {
+                validationState = ValidationState.WillReplace;
                 validationMessage = "Warning: A prefab already exists at the target location. It will be replaced.";
-                isValid = true; // Still allow execution, but with warning
             }
             else
             {
-                isValid = true;
+                validationState = ValidationState.Ready;
                 validationMessage = "Ready to organize prefab";
             }
         }
@@ -422,15 +472,62 @@ namespace DivineDragon
 
         private void Execute()
         {
-            if (!isValid || selectedPrefab == null) return;
+            bool canExecute = validationState == ValidationState.Ready || 
+                            validationState == ValidationState.NeedsAddressableOnly || 
+                            validationState == ValidationState.WillReplace;
+                            
+            if (!canExecute || selectedPrefab == null) return;
             
             try
             {
                 string currentPath = AssetDatabase.GetAssetPath(selectedPrefab);
                 string targetFullPath = previewTargetPath + previewFilename;
                 
+                // Handle different validation states
+                if (validationState == ValidationState.NeedsAddressableOnly)
+                {
+                    // Just update the addressable path, no file movement needed
+                    UpdateAddressable(currentPath, previewAddressablePath);
+                    
+                    AssetDatabase.SaveAssets();
+                    AssetDatabase.Refresh();
+                    
+                    // Show success
+                    showSuccess = true;
+                    
+                    // Clear the form
+                    selectedPrefab = null;
+                    modelName = "";
+                    characterId = "";
+                    UpdatePreview();
+                    
+                    // Force window repaint to show success button
+                    Repaint();
+                    return;
+                }
+                
                 // Create directory structure if it doesn't exist
                 CreateDirectoryStructure(previewTargetPath);
+                
+                // Handle replacement case
+                if (validationState == ValidationState.WillReplace)
+                {
+                    // Show confirmation dialog
+                    bool shouldReplace = EditorUtility.DisplayDialog(
+                        "Replace Existing Prefab?",
+                        $"A prefab already exists at:\n{targetFullPath}\n\nDo you want to replace it?",
+                        "Replace",
+                        "Cancel"
+                    );
+                    
+                    if (!shouldReplace)
+                    {
+                        return;
+                    }
+                    
+                    // Delete the existing prefab first
+                    AssetDatabase.DeleteAsset(targetFullPath);
+                }
                 
                 // Move and rename the prefab
                 string error = AssetDatabase.MoveAsset(currentPath, targetFullPath);

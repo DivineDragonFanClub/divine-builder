@@ -73,7 +73,10 @@ namespace DivineDragon
         private TextField sdPathField;
         private TextField modPathField;
         private Label buildStatusLabel;
+        private Button openConsoleButton;
         private Color cobaltBlue = new Color(0.0f, 0.28f, 0.67f, 1.0f);
+        private DateTime? lastBuildTime = null;
+        private double lastUpdateTime = 0;
 
         [MenuItem("Divine Dragon/Divine Dragon Window #%d", false, 1501)]
         public static void ShowSettings()
@@ -82,6 +85,20 @@ namespace DivineDragon
             wnd.titleContent = new GUIContent("Divine Dragon Window");
         }
 
+        void Update()
+        {
+            // Update the build timestamp every second if we have a build time
+            if (lastBuildTime.HasValue && buildStatusLabel != null)
+            {
+                // Only update once per second to avoid excessive updates
+                if (EditorApplication.timeSinceStartup - lastUpdateTime >= 1.0)
+                {
+                    lastUpdateTime = EditorApplication.timeSinceStartup;
+                    buildStatusLabel.text = TimeFormatter.FormatBuildCompleteMessage(lastBuildTime.Value);
+                }
+            }
+        }
+        
         public void OnEnable()
         {
             // 3
@@ -264,8 +281,15 @@ namespace DivineDragon
             buildButton.clickable.clicked += () =>
             {
                 Build.BuildAddressableContent();
-                buildStatusLabel.text = "Build complete at " + DateTime.Now + " ✔ (See debug logs for details)";
+                lastBuildTime = DateTime.Now;
+                buildStatusLabel.text = TimeFormatter.FormatBuildCompleteMessage(lastBuildTime.Value);
                 buildStatusLabel.style.color = Color.green;
+                
+                // Show the console button after build
+                if (openConsoleButton != null)
+                {
+                    openConsoleButton.style.display = DisplayStyle.Flex;
+                }
             };
 
             modPathField.RegisterValueChangedCallback(evt =>
@@ -342,6 +366,22 @@ namespace DivineDragon
         private void InitializeBuildStatusLabel(VisualElement divineWindow)
         {
             buildStatusLabel = divineWindow.Q<Label>("buildStatusLabel");
+            openConsoleButton = divineWindow.Q<Button>("openConsoleButton");
+            
+            // Set up console button click handler
+            if (openConsoleButton != null)
+            {
+                // Make it look like a hyperlink - just blue, no hover effects
+                var linkColor = new Color(0.392f, 0.584f, 0.929f); // Cornflower blue
+                openConsoleButton.style.color = linkColor;
+                
+                openConsoleButton.clickable.clicked += () =>
+                {
+                    // Open Unity Console window
+                    Type consoleWindowType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.ConsoleWindow");
+                    EditorWindow.GetWindow(consoleWindowType).Show();
+                };
+            }
 
             // Initial update
             UpdateBuildStatus();
@@ -356,6 +396,13 @@ namespace DivineDragon
             SetFieldBorderColorAndWidth(sdPathField, Color.clear, 1);
             SetFieldBorderColorAndWidth(modPathField, Color.clear, 1);
             SetFieldBorderColorAndWidth(buildButton, Color.clear, 1);
+            
+            // Clear last build time and hide console button when status changes
+            lastBuildTime = null;
+            if (openConsoleButton != null)
+            {
+                openConsoleButton.style.display = DisplayStyle.None;
+            }
 
             if (string.IsNullOrEmpty(sdPathField.value))
             {

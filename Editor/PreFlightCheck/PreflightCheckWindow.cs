@@ -60,7 +60,7 @@ namespace DivineDragon.PreFlightCheck
             {
                 GUILayout.Label($"Found {issues.Count} issues", EditorStyles.toolbarButton);
                 GUILayout.Label("|", EditorStyles.toolbarButton, GUILayout.Width(10));
-                GUILayout.Label($"Last checked: {GetRelativeTime(lastCheckTime)}", EditorStyles.toolbarButton);
+                GUILayout.Label($"Last checked: {TimeFormatter.GetRelativeTimeWithTimestamp(lastCheckTime)}", EditorStyles.toolbarButton);
             }
             else
             {
@@ -407,19 +407,6 @@ namespace DivineDragon.PreFlightCheck
             };
         }
         
-        private string GetRelativeTime(DateTime time)
-        {
-            var timeSpan = DateTime.Now - time;
-            
-            if (timeSpan.TotalSeconds < 60)
-                return "just now";
-            if (timeSpan.TotalMinutes < 60)
-                return $"{(int)timeSpan.TotalMinutes} minute{((int)timeSpan.TotalMinutes == 1 ? "" : "s")} ago";
-            if (timeSpan.TotalHours < 24)
-                return $"{(int)timeSpan.TotalHours} hour{((int)timeSpan.TotalHours == 1 ? "" : "s")} ago";
-            
-            return time.ToString("h:mm tt");
-        }
         
         private void OpenIssueAsset(BuildIssue issue)
         {
