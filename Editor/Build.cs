@@ -101,9 +101,10 @@ namespace DivineDragon
                 ps.UseShellExecute = runShell;
                 if (!runShell)
                 {
-                    ps.RedirectStandardOutput = true;
-                    ps.RedirectStandardError = true;
-                    ps.StandardOutputEncoding = System.Text.ASCIIEncoding.ASCII;
+                    //ps.RedirectStandardOutput = true;
+                    //ps.RedirectStandardError = true;
+                    //ps.StandardOutputEncoding = System.Text.ASCIIEncoding.ASCII;
+                    ps.CreateNoWindow = true;
                 }
                 if (args != null && args != "")
                 {
@@ -112,30 +113,30 @@ namespace DivineDragon
                 p.StartInfo = ps;
                 p.Start();
                 p.WaitForExit();
-                if (!runShell)
-                {
-                    string output = p.StandardOutput.ReadToEnd().Trim();
-                    if (!string.IsNullOrEmpty(output))
-                    {
-                        // Split output into lines and debug log each line
-                        string[] lines = output.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-                        foreach (string line in lines)
-                        {
-                            Debug.Log(string.Format("{0} Output: {1}", DateTime.Now, line));
-                        }
-                    }
+                //if (!runShell)
+                //{
+                //    string output = p.StandardOutput.ReadToEnd().Trim();
+                //    if (!string.IsNullOrEmpty(output))
+                //    {
+                //        // Split output into lines and debug log each line
+                //        string[] lines = output.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+                //        foreach (string line in lines)
+                //        {
+                //            Debug.Log(string.Format("{0} Output: {1}", DateTime.Now, line));
+                //        }
+                //    }
  
-                    string errors = p.StandardError.ReadToEnd().Trim();
-                    if (!string.IsNullOrEmpty(errors))
-                    {
-                        // Split output into lines and debug log each line
-                        string[] lines = errors.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-                        foreach (string line in lines)
-                        {
-                            Debug.Log(string.Format("{0} Output: {1}", DateTime.Now, line));
-                        }
-                    }
-                }
+                //    string errors = p.StandardError.ReadToEnd().Trim();
+                //    if (!string.IsNullOrEmpty(errors))
+                //    {
+                //        // Split output into lines and debug log each line
+                //        string[] lines = errors.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+                //        foreach (string line in lines)
+                //        {
+                //            Debug.Log(string.Format("{0} Output: {1}", DateTime.Now, line));
+                //        }
+                //    }
+                //}
             }
         }
 
@@ -168,7 +169,7 @@ namespace DivineDragon
                         if (File.Exists(filePath))
                         {
                             File.Delete(filePath);
-                            Debug.Log($"Deleted bundle: {filePath}");
+                            //Debug.Log($"Deleted bundle: {filePath}");
                         }
                     }
                 }
