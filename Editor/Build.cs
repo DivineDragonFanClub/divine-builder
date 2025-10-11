@@ -101,42 +101,36 @@ namespace DivineDragon
                 ps.UseShellExecute = runShell;
                 if (!runShell)
                 {
-                    //ps.RedirectStandardOutput = true;
-                    //ps.RedirectStandardError = true;
-                    //ps.StandardOutputEncoding = System.Text.ASCIIEncoding.ASCII;
+                    ps.RedirectStandardOutput = true;
+                    ps.RedirectStandardError = true;
+                    ps.StandardOutputEncoding = System.Text.ASCIIEncoding.ASCII;
                     ps.CreateNoWindow = true;
                 }
                 if (args != null && args != "")
                 {
                     ps.Arguments = args;
                 }
+
+                p.OutputDataReceived += (sender, e) => {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        Debug.Log($"Divine Builder: {e.Data}");
+                    }
+                };
+
+                p.ErrorDataReceived += (sender, e) => {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        Debug.LogError($"Divine Builder: {e.Data}");
+                    }
+                };
+
+                p.EnableRaisingEvents = true;
                 p.StartInfo = ps;
                 p.Start();
+                p.BeginOutputReadLine();
+                p.BeginErrorReadLine();
                 p.WaitForExit();
-                //if (!runShell)
-                //{
-                //    string output = p.StandardOutput.ReadToEnd().Trim();
-                //    if (!string.IsNullOrEmpty(output))
-                //    {
-                //        // Split output into lines and debug log each line
-                //        string[] lines = output.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-                //        foreach (string line in lines)
-                //        {
-                //            Debug.Log(string.Format("{0} Output: {1}", DateTime.Now, line));
-                //        }
-                //    }
- 
-                //    string errors = p.StandardError.ReadToEnd().Trim();
-                //    if (!string.IsNullOrEmpty(errors))
-                //    {
-                //        // Split output into lines and debug log each line
-                //        string[] lines = errors.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-                //        foreach (string line in lines)
-                //        {
-                //            Debug.Log(string.Format("{0} Output: {1}", DateTime.Now, line));
-                //        }
-                //    }
-                //}
             }
         }
 
