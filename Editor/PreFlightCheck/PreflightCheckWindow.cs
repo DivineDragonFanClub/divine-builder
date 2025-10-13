@@ -13,6 +13,24 @@ namespace DivineDragon.PreFlightCheck
         private DateTime lastCheckTime = DateTime.MinValue;
         private bool isChecking = false;
         private bool showRegisteredRules;
+        private static readonly GUIContent[] ModeLabelsWithAuto = {
+            new GUIContent("Check"),
+            new GUIContent("Check and attempt autofix"),
+            new GUIContent("Skip")
+        };
+        private static readonly PreFlightRuleSettings.RuleExecutionMode[] ModeValuesWithAuto = {
+            PreFlightRuleSettings.RuleExecutionMode.Check,
+            PreFlightRuleSettings.RuleExecutionMode.CheckAndAutoApply,
+            PreFlightRuleSettings.RuleExecutionMode.Skip
+        };
+        private static readonly GUIContent[] ModeLabelsWithoutAuto = {
+            new GUIContent("Check"),
+            new GUIContent("Skip")
+        };
+        private static readonly PreFlightRuleSettings.RuleExecutionMode[] ModeValuesWithoutAuto = {
+            PreFlightRuleSettings.RuleExecutionMode.Check,
+            PreFlightRuleSettings.RuleExecutionMode.Skip
+        };
         
         private enum ViewMode
         {
@@ -169,14 +187,9 @@ namespace DivineDragon.PreFlightCheck
 
                     EditorGUILayout.LabelField(header, EditorStyles.boldLabel);
 
-                    foreach (var info in group.OrderBy(i => i.RuleType?.Name ?? "Unknown Rule"))
+                    foreach (var info in group.OrderBy(i => i.RuleName))
                     {
-                        string ruleName = info.RuleType != null ? info.RuleType.Name : "Unknown Rule";
-                        string namespaceName = info.RuleType?.Namespace ?? "No namespace";
-                        string assemblyLabel = info.AssemblyName ?? "Unknown assembly";
-                        
-                        EditorGUILayout.LabelField($"• {ruleName}", EditorStyles.label);
-                        // EditorGUILayout.LabelField($"{namespaceName}  —  {assemblyLabel}", EditorStyles.miniLabel);
+                        DrawRuleSettingsRow(info);
                     }
 
                     EditorGUILayout.EndVertical();
@@ -185,6 +198,76 @@ namespace DivineDragon.PreFlightCheck
 
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space(5);
+        }
+
+        private void DrawRuleSettingsRow(PreFlightRuleRegistry.RegisteredRuleInfo info)
+        {
+            if (info.RuleType == null)
+            {
+                EditorGUILayout.HelpBox("Rule type could not be resolved.", MessageType.Warning);
+                return;
+            }
+
+            var titleStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 11 };
+
+            EditorGUILayout.BeginVertical();
+
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(info.RuleName ?? "Unknown Rule", titleStyle);
+            GUILayout.FlexibleSpace();
+            DrawModeDropdown(info);
+            EditorGUILayout.EndHorizontal();
+
+            if (!string.IsNullOrEmpty(info.RuleDescription))
+            {
+                EditorGUILayout.LabelField(info.RuleDescription, EditorStyles.wordWrappedMiniLabel);
+            }
+
+            string sourceLabel = info.PackageDisplayName ??
+                                 info.PackageName ??
+                                 info.AssemblyName ??
+                                 info.RuleType.Namespace ??
+                                 "Unknown Source";
+
+            EditorGUILayout.LabelField($"{info.DefaultSeverity}  •  {sourceLabel}", EditorStyles.miniLabel);
+
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(6);
+        }
+
+        private void DrawModeDropdown(PreFlightRuleRegistry.RegisteredRuleInfo info)
+        {
+            var currentMode = info.Mode;
+            if (!info.CanAutoFix && currentMode == PreFlightRuleSettings.RuleExecutionMode.CheckAndAutoApply)
+            {
+                currentMode = PreFlightRuleSettings.RuleExecutionMode.Check;
+                PreFlightRuleRegistry.SetRuleMode(info.RuleType, currentMode);
+            }
+
+            PreFlightRuleSettings.RuleExecutionMode[] values;
+            GUIContent[] labels;
+
+            if (info.CanAutoFix)
+            {
+                values = ModeValuesWithAuto;
+                labels = ModeLabelsWithAuto;
+            }
+            else
+            {
+                values = ModeValuesWithoutAuto;
+                labels = ModeLabelsWithoutAuto;
+            }
+
+            int currentIndex = Array.IndexOf(values, currentMode);
+            if (currentIndex < 0) currentIndex = 0;
+
+            EditorGUI.BeginChangeCheck();
+            int newIndex = EditorGUILayout.Popup(currentIndex, labels, GUILayout.Width(200));
+            if (EditorGUI.EndChangeCheck())
+            {
+                var newMode = values[newIndex];
+                PreFlightRuleRegistry.SetRuleMode(info.RuleType, newMode);
+            }
         }
 
         private void DrawIssuesGroupedByRule()
