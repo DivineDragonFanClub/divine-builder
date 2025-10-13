@@ -9,16 +9,16 @@ namespace DivineDragon.PreFlightCheck
 {
     public static class PreFlightCheckManager
     {
-        private static readonly List<BuildRule> Rules = new List<BuildRule>
-        {
-            new SkinnedMeshRendererRule(),
-            new PrefabOverridesInScenesRule(),
-            new AddressableShaderRule(),
-            new OBodyAvatarRule()
-        };
-
         public static List<BuildIssue> RunAllChecks()
         {
+            var rules = PreFlightRuleRegistry.CreateRegisteredRules();
+            
+            if (rules.Count == 0)
+            {
+                Debug.LogWarning("No pre-flight rules have been registered. Skipping checks.");
+                return new List<BuildIssue>();
+            }
+
             var allIssues = new List<BuildIssue>();
             var settings = AddressableAssetSettingsDefaultObject.Settings;
             
@@ -44,7 +44,7 @@ namespace DivineDragon.PreFlightCheck
                     if (asset == null) continue;
                     
                     // Run each rule against this asset
-                    foreach (var rule in Rules)
+                    foreach (var rule in rules)
                     {
                         if (rule.AppliesTo(assetPath, asset))
                         {
@@ -56,7 +56,7 @@ namespace DivineDragon.PreFlightCheck
             }
             
             // Run special checks that don't iterate through addressables (like scene checks)
-            foreach (var rule in Rules)
+            foreach (var rule in rules)
             {
                 if (rule.AppliesTo("SCENE_CHECK", null))
                 {

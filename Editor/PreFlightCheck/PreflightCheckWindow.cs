@@ -12,6 +12,7 @@ namespace DivineDragon.PreFlightCheck
         private Vector2 scrollPosition;
         private DateTime lastCheckTime = DateTime.MinValue;
         private bool isChecking = false;
+        private bool showRegisteredRules;
         
         private enum ViewMode
         {
@@ -86,6 +87,11 @@ namespace DivineDragon.PreFlightCheck
                     FixAllIssues();
                 }
             }
+
+            if (GUILayout.Button(showRegisteredRules ? "Hide Rules" : "Show Rules", EditorStyles.toolbarButton, GUILayout.Width(100)))
+            {
+                showRegisteredRules = !showRegisteredRules;
+            }
             
             if (GUILayout.Button("Refresh", EditorStyles.toolbarButton, GUILayout.Width(80)))
             {
@@ -94,6 +100,11 @@ namespace DivineDragon.PreFlightCheck
             
             EditorGUILayout.EndHorizontal();
             
+            if (showRegisteredRules)
+            {
+                DrawRegisteredRulesPanel();
+            }
+
             // Issue list
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
             
@@ -124,6 +135,56 @@ namespace DivineDragon.PreFlightCheck
             
             EditorGUILayout.EndScrollView();
             EditorGUILayout.EndVertical();
+        }
+
+        private void DrawRegisteredRulesPanel()
+        {
+            var registeredRules = PreFlightRuleRegistry.GetRegisteredRuleInfos();
+
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.LabelField("Registered Rules", EditorStyles.boldLabel);
+
+            if (registeredRules.Count == 0)
+            {
+                EditorGUILayout.HelpBox("No rules are currently registered. Additional rule packages may not be loaded.", MessageType.Warning);
+            }
+            else
+            {
+                var grouped = registeredRules
+                    .GroupBy(info =>
+                        info.PackageDisplayName ?? info.PackageName ??
+                        (info.AssemblyName != null ? $"Assembly: {info.AssemblyName}" : "Unknown Source"))
+                    .OrderBy(g => g.Key);
+
+                foreach (var group in grouped)
+                {
+                    EditorGUILayout.BeginVertical(GUI.skin.box);
+
+                    string header = group.Key;
+                    var sample = group.First();
+                    if (!string.IsNullOrEmpty(sample.PackageVersion) && sample.PackageDisplayName != null)
+                    {
+                        header = $"{sample.PackageDisplayName} ({sample.PackageName} {sample.PackageVersion})";
+                    }
+
+                    EditorGUILayout.LabelField(header, EditorStyles.boldLabel);
+
+                    foreach (var info in group.OrderBy(i => i.RuleType?.Name ?? "Unknown Rule"))
+                    {
+                        string ruleName = info.RuleType != null ? info.RuleType.Name : "Unknown Rule";
+                        string namespaceName = info.RuleType?.Namespace ?? "No namespace";
+                        string assemblyLabel = info.AssemblyName ?? "Unknown assembly";
+                        
+                        EditorGUILayout.LabelField($"• {ruleName}", EditorStyles.label);
+                        // EditorGUILayout.LabelField($"{namespaceName}  —  {assemblyLabel}", EditorStyles.miniLabel);
+                    }
+
+                    EditorGUILayout.EndVertical();
+                }
+            }
+
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(5);
         }
 
         private void DrawIssuesGroupedByRule()
