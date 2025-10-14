@@ -74,11 +74,12 @@ namespace DivineDragon.PreFlightCheck
                 }
             }
             
-            // Run special checks that don't iterate through addressables (like scene checks)
+            // Run special checks that don't iterate through addressables (like scene checks and addressable path checks)
             foreach (var activeRule in activeRules)
             {
                 var rule = activeRule.Rule;
-                
+
+                // Check for scene-specific rules
                 if (rule.AppliesTo("SCENE_CHECK", null))
                 {
                     var issuesForRule = rule.Validate("SCENE_CHECK", null);
@@ -91,7 +92,24 @@ namespace DivineDragon.PreFlightCheck
                             issuesForRule = rule.Validate("SCENE_CHECK", null);
                         }
                     }
-                    
+
+                    allIssues.AddRange(issuesForRule);
+                }
+
+                // Check for addressable path validation rules
+                if (rule.AppliesTo("ADDRESSABLE_PATH_CHECK", null))
+                {
+                    var issuesForRule = rule.Validate("ADDRESSABLE_PATH_CHECK", null);
+
+                    if (issuesForRule.Count > 0 && activeRule.AutoApply)
+                    {
+                        if (AttemptAutoApply(rule, issuesForRule))
+                        {
+                            autoFixApplied = true;
+                            issuesForRule = rule.Validate("ADDRESSABLE_PATH_CHECK", null);
+                        }
+                    }
+
                     allIssues.AddRange(issuesForRule);
                 }
             }

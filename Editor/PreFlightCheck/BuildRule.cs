@@ -63,5 +63,34 @@ namespace DivineDragon.PreFlightCheck
         /// <param name="issue">The issue to fix</param>
         /// <returns>True if the fix was successful</returns>
         public abstract bool AutoFix(BuildIssue issue);
+
+        /// <summary>
+        /// Indicates whether this rule has configurable settings
+        /// </summary>
+        public virtual bool HasConfiguration => false;
+
+        /// <summary>
+        /// Draws the configuration UI for this rule in the settings window
+        /// </summary>
+        public virtual void DrawConfiguration()
+        {
+            // Override in derived classes to provide configuration UI
+        }
+
+        /// <summary>
+        /// Loads the configuration for this rule
+        /// </summary>
+        public virtual void LoadConfiguration()
+        {
+            // Override in derived classes to load saved configuration
+        }
+
+        /// <summary>
+        /// Saves the configuration for this rule
+        /// </summary>
+        public virtual void SaveConfiguration()
+        {
+            // Override in derived classes to save configuration
+        }
     }
 }

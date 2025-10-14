@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
@@ -9,6 +10,8 @@ namespace DivineDragon.PreFlightCheck
     {
         private Vector2 scrollPosition;
         private string searchText = string.Empty;
+        private Dictionary<string, bool> expandedRules = new Dictionary<string, bool>();
+        private Dictionary<string, BuildRule> ruleInstances = new Dictionary<string, BuildRule>();
         private static readonly GUIContent[] ModeLabelsWithAuto = {
             new GUIContent("Enabled"),
             new GUIContent("Auto-fix"),
@@ -129,6 +132,47 @@ namespace DivineDragon.PreFlightCheck
             EditorGUILayout.BeginVertical();
 
             EditorGUILayout.BeginHorizontal();
+
+            // Check if rule has configuration and get/create instance
+            BuildRule ruleInstance = null;
+            bool hasConfig = false;
+
+            string ruleKey = info.RuleType.FullName;
+            if (!ruleInstances.TryGetValue(ruleKey, out ruleInstance))
+            {
+                try
+                {
+                    ruleInstance = Activator.CreateInstance(info.RuleType) as BuildRule;
+                    if (ruleInstance != null)
+                    {
+                        ruleInstances[ruleKey] = ruleInstance;
+                        hasConfig = ruleInstance.HasConfiguration;
+                    }
+                }
+                catch { }
+            }
+            else
+            {
+                hasConfig = ruleInstance.HasConfiguration;
+            }
+
+            // Draw expand/collapse arrow if rule has configuration
+            if (hasConfig)
+            {
+                if (!expandedRules.ContainsKey(ruleKey))
+                    expandedRules[ruleKey] = false;
+
+                var arrowContent = expandedRules[ruleKey] ? new GUIContent("▼") : new GUIContent("▶");
+                if (GUILayout.Button(arrowContent, EditorStyles.label, GUILayout.Width(20)))
+                {
+                    expandedRules[ruleKey] = !expandedRules[ruleKey];
+                }
+            }
+            else
+            {
+                GUILayout.Space(20); // Maintain alignment
+            }
+
             EditorGUILayout.LabelField(info.RuleName ?? "Unknown Rule", titleStyle);
             GUILayout.FlexibleSpace();
             DrawModeDropdown(info);
@@ -141,6 +185,14 @@ namespace DivineDragon.PreFlightCheck
             }
 
             EditorGUILayout.LabelField($"{info.DefaultSeverity}", EditorStyles.miniLabel);
+
+            // Draw configuration if expanded
+            if (hasConfig && expandedRules[ruleKey] && ruleInstance != null)
+            {
+                EditorGUILayout.Space(5);
+                ruleInstance.DrawConfiguration();
+            }
+
             EditorGUILayout.EndVertical();
 
             EditorGUILayout.EndVertical();
