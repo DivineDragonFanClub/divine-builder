@@ -13,6 +13,12 @@ namespace DivineDragon.PreFlightCheck
     {
         public static List<BuildIssue> RunAllChecks()
         {
+            if (EditorApplication.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                Debug.LogWarning("Pre-flight checks are disabled while the Editor is in play mode.");
+                return new List<BuildIssue>();
+            }
+
             var activeRules = PreFlightRuleRegistry.CreateActiveRules();
             
             if (activeRules.Count == 0)
@@ -52,24 +58,33 @@ namespace DivineDragon.PreFlightCheck
                     {
                         var rule = activeRule.Rule;
 
-                        if (rule.AppliesTo(assetPath, asset))
-                        {
-                            var issuesForRule = rule.Validate(assetPath, asset);
+                        if (!rule.AppliesTo(assetPath, asset))
+                            continue;
 
-                            if (issuesForRule.Count > 0 && activeRule.AutoApply)
-                            {
-                                if (AttemptAutoApply(rule, issuesForRule))
-                                {
-                                    autoFixApplied = true;
-                                    asset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
-                                    issuesForRule = asset != null
-                                        ? rule.Validate(assetPath, asset)
-                                        : new List<BuildIssue>();
-                                }
-                            }
-                            
-                            allIssues.AddRange(issuesForRule);
+                        List<BuildIssue> issuesForRule;
+                        try
+                        {
+                            issuesForRule = rule.Validate(assetPath, asset);
                         }
+                        catch (System.Exception ex)
+                        {
+                            Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception while validating '{assetPath}': {ex}");
+                            continue;
+                        }
+
+                        if (issuesForRule.Count > 0 && activeRule.AutoApply)
+                        {
+                            if (AttemptAutoApply(rule, issuesForRule))
+                            {
+                                autoFixApplied = true;
+                                asset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
+                                issuesForRule = asset != null
+                                    ? rule.Validate(assetPath, asset)
+                                    : new List<BuildIssue>();
+                            }
+                        }
+                        
+                        allIssues.AddRange(issuesForRule);
                     }
                 }
             }
@@ -82,7 +97,16 @@ namespace DivineDragon.PreFlightCheck
                 // Check for scene-specific rules
                 if (rule.AppliesTo("SCENE_CHECK", null))
                 {
-                    var issuesForRule = rule.Validate("SCENE_CHECK", null);
+                    List<BuildIssue> issuesForRule;
+                    try
+                    {
+                        issuesForRule = rule.Validate("SCENE_CHECK", null);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception during scene check: {ex}");
+                        continue;
+                    }
 
                     if (issuesForRule.Count > 0 && activeRule.AutoApply)
                     {
@@ -99,7 +123,16 @@ namespace DivineDragon.PreFlightCheck
                 // Check for addressable path validation rules
                 if (rule.AppliesTo("ADDRESSABLE_PATH_CHECK", null))
                 {
-                    var issuesForRule = rule.Validate("ADDRESSABLE_PATH_CHECK", null);
+                    List<BuildIssue> issuesForRule;
+                    try
+                    {
+                        issuesForRule = rule.Validate("ADDRESSABLE_PATH_CHECK", null);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception during addressable path check: {ex}");
+                        continue;
+                    }
 
                     if (issuesForRule.Count > 0 && activeRule.AutoApply)
                     {
