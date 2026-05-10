@@ -24,7 +24,10 @@
                 <ui:Button text="Open Console" display-tooltip-when-elided="true" name="openConsoleButton" style="display: none; margin-left: 5px; padding: 0; font-size: 14px; background-color: rgba(0, 0, 0, 0); border-width: 0; color: rgb(100, 149, 237); -unity-font-style: normal;" />
             </ui:VisualElement>
             <ui:Button text="Build" display-tooltip-when-elided="true" name="BuildAddressablesDivine" style="border-left-color: rgb(0, 71, 171); border-right-color: rgb(0, 71, 171); border-top-color: rgb(0, 71, 171); border-bottom-color: rgb(0, 71, 171); margin-bottom: 3px; margin-left: 0; margin-right: 0; margin-top: 0;" />
-            <ui:Toggle label="Run pre-build checks" name="runPreBuildChecksCheckbox" tooltip="Run validation checks before building and show issues if found" />
+            <ui:VisualElement style="flex-direction: row; align-items: center; margin-top: 3px; margin-bottom: 3px;">
+                <ui:Label text="Pre-build checks:" style="margin-right: 5px;" />
+                <ui:VisualElement name="preBuildCheckModeDropdown" />
+            </ui:VisualElement>
             <ui:Toggle label="Open output folder after build" name="openAfterBuildCheckbox" />
         </ui:VisualElement>
     </ui:VisualElement>

@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Build;
@@ -28,21 +29,40 @@ namespace DivineDragon
 
         public static bool BuildAddressableContent()
         {
-            // Check if pre-build checks are enabled
-            if (DivineDragonSettingsScriptableObject.instance.getRunPreBuildChecks())
+            var checkMode = DivineDragonSettingsScriptableObject.instance.getPreBuildCheckMode();
+
+            if (checkMode == PreBuildCheckMode.Skip)
             {
-                // Run pre-flight checks
+                Debug.Log("Pre-build checks are disabled. Skipping validation.");
+            }
+            else
+            {
+                // If autofix mode, attempt to fix issues first
+                if (checkMode == PreBuildCheckMode.AutofixAndCheck)
+                {
+                    var initialIssues = PreFlightCheck.PreFlightCheckManager.RunAllChecks();
+                    var fixableCount = initialIssues.Count(i => i.Rule.CanAutoFix);
+
+                    if (fixableCount > 0)
+                    {
+                        Debug.Log($"Attempting to autofix {fixableCount} issues...");
+                        int fixedCount = PreFlightCheck.PreFlightCheckManager.AutoFixAll(initialIssues);
+                        Debug.Log($"Autofixed {fixedCount} issues.");
+                    }
+                }
+
+                // Run final check
                 var issues = PreFlightCheck.PreFlightCheckManager.RunAllChecks();
-                
+
                 if (issues.Count > 0)
                 {
                     // Show issues window
                     PreFlightCheck.PreflightCheckWindow.ShowWithIssues(issues);
-                    
-                    // Always block build when checks are enabled and issues found
+
+                    // Block build when issues found
                     Debug.LogError($"Build cancelled. Found {issues.Count} issues during pre-build checks. Please check the Preflight Check window.");
-                    EditorUtility.DisplayDialog("Pre-Build Check Failed", 
-                        $"Found {issues.Count} issues during pre-build checks.\n\nPlease check the Preflight Check window and fix the issues before building.", 
+                    EditorUtility.DisplayDialog("Pre-Build Check Failed",
+                        $"Found {issues.Count} issues during pre-build checks.\n\nPlease check the Preflight Check window and fix the issues before building.",
                         "OK");
                     return false;
                 }
@@ -50,10 +70,6 @@ namespace DivineDragon
                 {
                     Debug.Log("Pre-flight checks passed. No issues found.");
                 }
-            }
-            else
-            {
-                Debug.Log("Pre-build checks are disabled. Skipping validation.");
             }
             
             AddressableAssetSettings

@@ -11,6 +11,8 @@ namespace DivineDragon.PreFlightCheck
 {
     public static class PreFlightCheckManager
     {
+        private const int MaxIterations = 10;
+
         public static List<BuildIssue> RunAllChecks()
         {
             if (EditorApplication.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode)
@@ -20,55 +22,98 @@ namespace DivineDragon.PreFlightCheck
             }
 
             var activeRules = PreFlightRuleRegistry.CreateActiveRules();
-            
+
             if (activeRules.Count == 0)
             {
                 Debug.LogWarning("No pre-flight rules have been registered. Skipping checks.");
                 return new List<BuildIssue>();
             }
 
-            var allIssues = new List<BuildIssue>();
             var settings = AddressableAssetSettingsDefaultObject.Settings;
-            
+
             if (settings == null)
             {
                 Debug.LogError("Addressable settings not found. Cannot run pre-flight checks.");
-                return allIssues;
+                return new List<BuildIssue>();
             }
 
-            bool autoFixApplied = false;
+            var allIssues = new List<BuildIssue>();
+            int iteration = 0;
+            bool autoFixApplied;
 
-            // Iterate through all addressable groups and entries
-            foreach (var group in settings.groups)
+            do
             {
-                if (group == null) continue;
-                
-                foreach (var entry in group.entries)
+                iteration++;
+                allIssues.Clear();
+                autoFixApplied = false;
+
+                // Iterate through all addressable groups and entries
+                foreach (var group in settings.groups)
                 {
-                    if (entry == null) continue;
-                    
-                    string assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
-                    if (string.IsNullOrEmpty(assetPath)) continue;
-                    
-                    Object asset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
-                    if (asset == null) continue;
-                    
-                    // Run each rule against this asset
-                    foreach (var activeRule in activeRules)
+                    if (group == null) continue;
+
+                    foreach (var entry in group.entries)
                     {
-                        var rule = activeRule.Rule;
+                        if (entry == null) continue;
 
-                        if (!rule.AppliesTo(assetPath, asset))
-                            continue;
+                        string assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
+                        if (string.IsNullOrEmpty(assetPath)) continue;
 
+                        Object asset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
+                        if (asset == null) continue;
+
+                        // Run each rule against this asset
+                        foreach (var activeRule in activeRules)
+                        {
+                            var rule = activeRule.Rule;
+
+                            if (!rule.AppliesTo(assetPath, asset))
+                                continue;
+
+                            List<BuildIssue> issuesForRule;
+                            try
+                            {
+                                issuesForRule = rule.Validate(assetPath, asset);
+                            }
+                            catch (System.Exception ex)
+                            {
+                                Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception while validating '{assetPath}': {ex}");
+                                continue;
+                            }
+
+                            if (issuesForRule.Count > 0 && activeRule.AutoApply)
+                            {
+                                if (AttemptAutoApply(rule, issuesForRule))
+                                {
+                                    autoFixApplied = true;
+                                    asset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
+                                    issuesForRule = asset != null
+                                        ? rule.Validate(assetPath, asset)
+                                        : new List<BuildIssue>();
+                                }
+                            }
+
+                            allIssues.AddRange(issuesForRule);
+                        }
+                    }
+                }
+
+                // Run special checks that don't iterate through addressables (like scene checks and addressable path checks)
+                foreach (var activeRule in activeRules)
+                {
+                    var rule = activeRule.Rule;
+
+                    // Check for scene-specific rules
+                    if (rule.AppliesTo("SCENE_CHECK", null))
+                    {
                         List<BuildIssue> issuesForRule;
                         try
                         {
-                            issuesForRule = rule.Validate(assetPath, asset);
+                            issuesForRule = rule.Validate("SCENE_CHECK", null);
                         }
                         catch (System.Exception ex)
                         {
-                            Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception while validating '{assetPath}': {ex}");
+                            Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception during scene check: {ex}");
                             continue;
                         }
 
@@ -77,82 +122,57 @@ namespace DivineDragon.PreFlightCheck
                             if (AttemptAutoApply(rule, issuesForRule))
                             {
                                 autoFixApplied = true;
-                                asset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
-                                issuesForRule = asset != null
-                                    ? rule.Validate(assetPath, asset)
-                                    : new List<BuildIssue>();
+                                issuesForRule = rule.Validate("SCENE_CHECK", null);
                             }
                         }
-                        
+
+                        allIssues.AddRange(issuesForRule);
+                    }
+
+                    // Check for addressable path validation rules
+                    if (rule.AppliesTo("ADDRESSABLE_PATH_CHECK", null))
+                    {
+                        List<BuildIssue> issuesForRule;
+                        try
+                        {
+                            issuesForRule = rule.Validate("ADDRESSABLE_PATH_CHECK", null);
+                        }
+                        catch (System.Exception ex)
+                        {
+                            Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception during addressable path check: {ex}");
+                            continue;
+                        }
+
+                        if (issuesForRule.Count > 0 && activeRule.AutoApply)
+                        {
+                            if (AttemptAutoApply(rule, issuesForRule))
+                            {
+                                autoFixApplied = true;
+                                issuesForRule = rule.Validate("ADDRESSABLE_PATH_CHECK", null);
+                            }
+                        }
+
                         allIssues.AddRange(issuesForRule);
                     }
                 }
-            }
-            
-            // Run special checks that don't iterate through addressables (like scene checks and addressable path checks)
-            foreach (var activeRule in activeRules)
-            {
-                var rule = activeRule.Rule;
 
-                // Check for scene-specific rules
-                if (rule.AppliesTo("SCENE_CHECK", null))
+                if (autoFixApplied)
                 {
-                    List<BuildIssue> issuesForRule;
-                    try
+                    AssetDatabase.Refresh();
+
+                    if (iteration >= MaxIterations)
                     {
-                        issuesForRule = rule.Validate("SCENE_CHECK", null);
-                    }
-                    catch (System.Exception ex)
-                    {
-                        Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception during scene check: {ex}");
-                        continue;
+                        Debug.LogWarning($"Pre-flight check reached maximum iterations ({MaxIterations}). " +
+                            "There may be conflicting rules causing fixes to cycle.");
+                        break;
                     }
 
-                    if (issuesForRule.Count > 0 && activeRule.AutoApply)
-                    {
-                        if (AttemptAutoApply(rule, issuesForRule))
-                        {
-                            autoFixApplied = true;
-                            issuesForRule = rule.Validate("SCENE_CHECK", null);
-                        }
-                    }
-
-                    allIssues.AddRange(issuesForRule);
+                    Debug.Log($"Pre-flight iteration {iteration}: Fixes applied, re-checking...");
                 }
 
-                // Check for addressable path validation rules
-                if (rule.AppliesTo("ADDRESSABLE_PATH_CHECK", null))
-                {
-                    List<BuildIssue> issuesForRule;
-                    try
-                    {
-                        issuesForRule = rule.Validate("ADDRESSABLE_PATH_CHECK", null);
-                    }
-                    catch (System.Exception ex)
-                    {
-                        Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception during addressable path check: {ex}");
-                        continue;
-                    }
+            } while (autoFixApplied);
 
-                    if (issuesForRule.Count > 0 && activeRule.AutoApply)
-                    {
-                        if (AttemptAutoApply(rule, issuesForRule))
-                        {
-                            autoFixApplied = true;
-                            issuesForRule = rule.Validate("ADDRESSABLE_PATH_CHECK", null);
-                        }
-                    }
-
-                    allIssues.AddRange(issuesForRule);
-                }
-            }
-            
-            if (autoFixApplied)
-            {
-                AssetDatabase.Refresh();
-            }
-            
-            Debug.Log($"Pre-flight check complete. Found {allIssues.Count} issues.");
+            Debug.Log($"Pre-flight check complete after {iteration} pass(es). Found {allIssues.Count} issues.");
             return allIssues;
         }
 
@@ -168,30 +188,52 @@ namespace DivineDragon.PreFlightCheck
 
         public static int AutoFixAll(List<BuildIssue> issues)
         {
-            int fixedCount = 0;
-            var fixableIssues = issues.Where(issue => issue.Rule.CanAutoFix).ToList();
-            
-            // Group by asset to avoid fixing the same asset multiple times
-            var issuesByAsset = fixableIssues.GroupBy(issue => issue.AssetPath);
-            
-            foreach (var assetGroup in issuesByAsset)
+            int totalFixedCount = 0;
+
+            for (int iteration = 1; iteration <= MaxIterations; iteration++)
             {
-                // Get the first issue for this asset (they should all have the same asset reference)
-                var firstIssue = assetGroup.First();
-                
-                // Try to fix all issues for this asset at once
-                if (firstIssue.Rule.AutoFix(firstIssue))
+                int fixedThisPass = 0;
+                var fixableIssues = issues.Where(issue => issue.Rule.CanAutoFix).ToList();
+
+                if (fixableIssues.Count == 0)
+                    break;
+
+                // Group by asset to avoid fixing the same asset multiple times
+                var issuesByAsset = fixableIssues.GroupBy(issue => issue.AssetPath);
+
+                foreach (var assetGroup in issuesByAsset)
                 {
-                    fixedCount += assetGroup.Count();
+                    // Get the first issue for this asset (they should all have the same asset reference)
+                    var firstIssue = assetGroup.First();
+
+                    // Try to fix all issues for this asset at once
+                    if (firstIssue.Rule.AutoFix(firstIssue))
+                    {
+                        fixedThisPass += assetGroup.Count();
+                    }
+                }
+
+                totalFixedCount += fixedThisPass;
+
+                if (fixedThisPass == 0)
+                    break;
+
+                // Refresh and re-check for cascading issues
+                AssetDatabase.Refresh();
+                issues = RunAllChecks();
+
+                if (iteration == MaxIterations)
+                {
+                    Debug.LogWarning($"AutoFixAll reached maximum iterations ({MaxIterations}). " +
+                        "There may be conflicting rules causing fixes to cycle.");
+                }
+                else if (issues.Any(i => i.Rule.CanAutoFix))
+                {
+                    Debug.Log($"AutoFixAll iteration {iteration}: Fixed {fixedThisPass} issues, found more autofixable issues, continuing...");
                 }
             }
-            
-            if (fixedCount > 0)
-            {
-                AssetDatabase.Refresh();
-            }
-            
-            return fixedCount;
+
+            return totalFixedCount;
         }
 
         private static bool AttemptAutoApply(BuildRule rule, List<BuildIssue> issues)

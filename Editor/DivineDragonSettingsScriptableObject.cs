@@ -1,12 +1,20 @@
 using System;
 using System.IO;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Debug = UnityEngine.Debug;
 
 namespace DivineDragon
 {
+    public enum PreBuildCheckMode
+    {
+        Skip,
+        CheckOnly,
+        AutofixAndCheck
+    }
+
     [FilePath("Assets/Editor/DivineSettings.settings", FilePathAttribute.Location.ProjectFolder)]
     public class DivineDragonSettingsScriptableObject : ScriptableSingleton<DivineDragonSettingsScriptableObject>
     {
@@ -18,7 +26,7 @@ namespace DivineDragon
         [SerializeField] string modPath;
 
         [SerializeField] private bool openAfterBuildCheckbox;
-        [SerializeField] private bool runPreBuildChecks = true;
+        [SerializeField] private PreBuildCheckMode preBuildCheckMode = PreBuildCheckMode.CheckOnly;
 
         public void setOpenAfterBuild(bool openAfterBuild)
         {
@@ -31,15 +39,15 @@ namespace DivineDragon
             return openAfterBuildCheckbox;
         }
         
-        public void setRunPreBuildChecks(bool runChecks)
+        public void setPreBuildCheckMode(PreBuildCheckMode mode)
         {
-            runPreBuildChecks = runChecks;
+            preBuildCheckMode = mode;
             Save(true);
         }
-        
-        public bool getRunPreBuildChecks()
+
+        public PreBuildCheckMode getPreBuildCheckMode()
         {
-            return runPreBuildChecks;
+            return preBuildCheckMode;
         }
 
         public void setSDCardPath(string path)
@@ -113,7 +121,7 @@ namespace DivineDragon
             root.Add(divineWindow);
 
             InitializeOpenAfterBuildCheckbox(divineWindow);
-            InitializeRunPreBuildChecksCheckbox(divineWindow);
+            InitializePreBuildCheckModeDropdown(divineWindow);
             InitializeBrowseSDButton(divineWindow);
             InitializeSDCardField(divineWindow);
             InitializeBrowseModButton(divineWindow);
@@ -134,14 +142,31 @@ namespace DivineDragon
             });
         }
         
-        private void InitializeRunPreBuildChecksCheckbox(VisualElement divineWindow)
+        private void InitializePreBuildCheckModeDropdown(VisualElement divineWindow)
         {
-            Toggle runPreBuildChecksCheckbox = divineWindow.Q<Toggle>("runPreBuildChecksCheckbox");
-            runPreBuildChecksCheckbox.value = DivineDragonSettingsScriptableObject.instance.getRunPreBuildChecks();
-            runPreBuildChecksCheckbox.RegisterValueChangedCallback(evt =>
+            // Find the container and replace with a PopupField
+            var container = divineWindow.Q<VisualElement>("preBuildCheckModeDropdown")?.parent;
+            if (container == null) return;
+
+            // Remove the placeholder dropdown from UXML
+            var placeholder = container.Q("preBuildCheckModeDropdown");
+            if (placeholder != null)
+                container.Remove(placeholder);
+
+            var choices = new System.Collections.Generic.List<string> { "Skip", "Check only", "Autofix" };
+            var currentMode = DivineDragonSettingsScriptableObject.instance.getPreBuildCheckMode();
+
+            var popup = new PopupField<string>(choices, (int)currentMode);
+            popup.tooltip = "Choose how to handle pre-build validation checks";
+            popup.style.minWidth = 150;
+
+            popup.RegisterValueChangedCallback(evt =>
             {
-                DivineDragonSettingsScriptableObject.instance.setRunPreBuildChecks(evt.newValue);
+                var newMode = (PreBuildCheckMode)choices.IndexOf(evt.newValue);
+                DivineDragonSettingsScriptableObject.instance.setPreBuildCheckMode(newMode);
             });
+
+            container.Add(popup);
         }
 
         private void InitializeSDCardField(VisualElement divineWindow)
