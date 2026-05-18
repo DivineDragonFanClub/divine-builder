@@ -147,6 +147,9 @@ namespace DivineDragon
                 return;
             }
 
+            int deleted = 0;
+            int missed = 0;
+
             foreach (var group in settings.groups)
             {
                 if (group == null || group.HasSchema<PlayerDataGroupSchema>())
@@ -156,18 +159,27 @@ namespace DivineDragon
 
                 foreach (var entry in group.entries)
                 {
-                    if (entry.labels.Contains(label))
+                    if (!entry.labels.Contains(label))
+                        continue;
+
+                    var sanitized = entry.address.ToLower().Replace(" ", "");
+                    var entryPath = groupPrefix + "_" + sanitized + ".bundle";
+                    var filePath = Path.Combine(outputDirectory, entryPath);
+
+                    if (File.Exists(filePath))
                     {
-                        var entryPath = groupPrefix + "_" + entry.address.ToLower() + ".bundle";
-                        var filePath = Path.Combine(outputDirectory, entryPath);
-                        if (File.Exists(filePath))
-                        {
-                            File.Delete(filePath);
-                            //Debug.Log($"Deleted bundle: {filePath}");
-                        }
+                        File.Delete(filePath);
+                        deleted++;
+                    }
+                    else
+                    {
+                        missed++;
+                        Debug.LogWarning($"[removePostBuild] expected bundle not found: {filePath}");
                     }
                 }
             }
+
+            Debug.Log($"[removePostBuild] deleted {deleted} bundle(s), {missed} not found.");
         }
     }
 }
