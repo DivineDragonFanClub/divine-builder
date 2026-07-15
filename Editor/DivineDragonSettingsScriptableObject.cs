@@ -18,6 +18,21 @@ namespace DivineDragon
 
         [SerializeField] private bool openAfterBuildCheckbox;
 
+        [SerializeField] private bool useLegacyRustPatcher;
+
+        public string gameCodeAssemblyName = "DivineDragon.GameCode";
+
+        public void setUseLegacyRustPatcher(bool value)
+        {
+            useLegacyRustPatcher = value;
+            Save(true);
+        }
+
+        public bool getUseLegacyRustPatcher()
+        {
+            return useLegacyRustPatcher;
+        }
+
         public void setOpenAfterBuild(bool openAfterBuild)
         {
             openAfterBuildCheckbox = openAfterBuild;
@@ -83,6 +98,7 @@ namespace DivineDragon
             root.Add(divineWindow);
 
             InitializeOpenAfterBuildCheckbox(divineWindow);
+            InitializeLegacyPatcherCheckbox(divineWindow);
             InitializeBrowseSDButton(divineWindow);
             InitializeSDCardField(divineWindow);
             InitializeBrowseModButton(divineWindow);
@@ -99,6 +115,18 @@ namespace DivineDragon
             openAfterBuildCheckbox.RegisterValueChangedCallback(evt =>
             {
                 DivineDragonSettingsScriptableObject.instance.setOpenAfterBuild(evt.newValue);
+            });
+        }
+
+        private void InitializeLegacyPatcherCheckbox(VisualElement divineWindow)
+        {
+            Toggle legacyToggle = divineWindow.Q<Toggle>("useLegacyRustPatcherCheckbox");
+            if (legacyToggle == null)
+                return;
+            legacyToggle.value = DivineDragonSettingsScriptableObject.instance.getUseLegacyRustPatcher();
+            legacyToggle.RegisterValueChangedCallback(evt =>
+            {
+                DivineDragonSettingsScriptableObject.instance.setUseLegacyRustPatcher(evt.newValue);
             });
         }
 
@@ -201,9 +229,17 @@ namespace DivineDragon
 
             buildButton.clickable.clicked += () =>
             {
-                Build.BuildAddressableContent();
-                buildStatusLabel.text = "Build complete at " + DateTime.Now + " ✔ (See debug logs for details)";
-                buildStatusLabel.style.color = Color.green;
+                bool ok = Build.BuildAddressableContent();
+                if (ok)
+                {
+                    buildStatusLabel.text = "Build complete at " + DateTime.Now + " ✔ (See debug logs for details)";
+                    buildStatusLabel.style.color = Color.green;
+                }
+                else
+                {
+                    buildStatusLabel.text = "Build failed at " + DateTime.Now + " ✖ (See console for errors)";
+                    buildStatusLabel.style.color = Color.red;
+                }
             };
 
             modPathField.RegisterValueChangedCallback(evt =>
