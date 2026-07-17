@@ -1,0 +1,368 @@
+/* Divine Builder window styling. Cobalt accent to match the rest of the suite.
+   Card backgrounds use a translucent grey so they read on both the dark and light editor skins. */
+
+.dd-scroll {
+    flex-grow: 1;
+}
+
+.dd-root {
+    padding-left: 14px;
+    padding-right: 14px;
+    padding-top: 12px;
+    padding-bottom: 14px;
+}
+
+.dd-header {
+    flex-shrink: 0;
+    margin-bottom: 10px;
+}
+
+.dd-title {
+    font-size: 20px;
+    -unity-font-style: bold;
+}
+
+.dd-accent {
+    height: 3px;
+    width: 48px;
+    margin-top: 5px;
+    border-radius: 2px;
+    background-color: rgb(0, 71, 171);
+}
+
+.dd-readme {
+    flex-shrink: 0;
+    white-space: normal;
+    margin-bottom: 12px;
+    opacity: 0.8;
+}
+
+.dd-card {
+    flex-shrink: 0;
+    background-color: rgba(127, 127, 127, 0.1);
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0.2);
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 10px;
+    padding-bottom: 12px;
+    margin-bottom: 10px;
+}
+
+.dd-section {
+    font-size: 13px;
+    -unity-font-style: bold;
+    margin-bottom: 6px;
+    opacity: 0.9;
+}
+
+.dd-dest-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.dd-dest-title {
+    margin-bottom: 0;
+}
+
+.dd-tabs {
+    flex-direction: row;
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0.28);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.dd-tab {
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-left: 9px;
+    padding-right: 9px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    border-width: 0;
+    border-left-width: 1px;
+    border-left-color: rgba(0, 0, 0, 0.22);
+    border-radius: 0;
+    background-color: rgba(127, 127, 127, 0.12);
+    font-size: 11px;
+    -unity-text-align: middle-center;
+}
+
+.dd-tab:hover {
+    background-color: rgba(127, 127, 127, 0.22);
+}
+
+.dd-tab-active {
+    background-color: rgb(0, 71, 171);
+    color: rgb(255, 255, 255);
+}
+
+.dd-tab-active:hover {
+    background-color: rgb(0, 71, 171);
+}
+
+.dd-field {
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.dd-row {
+    flex-direction: row;
+    margin-top: 8px;
+}
+
+.dd-row-end {
+    justify-content: flex-end;
+}
+
+.dd-btn {
+    height: 22px;
+    margin-left: 6px;
+    margin-right: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0.25);
+    white-space: normal;
+    -unity-text-align: middle-center;
+}
+
+.dd-btn-ghost {
+    background-color: rgba(127, 127, 127, 0.15);
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0.25);
+}
+
+.dd-btn-ghost:hover {
+    background-color: rgba(127, 127, 127, 0.3);
+}
+
+.dd-btn-danger {
+    background-color: rgba(176, 52, 52, 0.9);
+    color: rgb(255, 255, 255);
+}
+
+.dd-btn-danger:hover {
+    background-color: rgb(198, 60, 60);
+}
+
+.dd-btn-accent {
+    background-color: rgb(0, 71, 171);
+    color: rgb(255, 255, 255);
+}
+
+.dd-btn-accent:hover {
+    background-color: rgb(0, 90, 205);
+}
+
+.dd-btn-accent:disabled {
+    background-color: rgba(127, 127, 127, 0.25);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.dd-btn-danger:disabled {
+    background-color: rgba(127, 127, 127, 0.25);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* First button in a row: cancel dd-btn's left margin so it lines up with the list edge. */
+.dd-flush-left {
+    margin-left: 0;
+}
+
+.dd-btn-primary {
+    margin-top: 4px;
+    margin-left: 0;
+    margin-right: 0;
+    margin-bottom: 0;
+    height: 30px;
+    font-size: 14px;
+    -unity-font-style: bold;
+    color: rgb(255, 255, 255);
+    background-color: rgb(0, 71, 171);
+    border-width: 0;
+    border-radius: 5px;
+}
+
+.dd-btn-primary:hover {
+    background-color: rgb(0, 90, 205);
+}
+
+.dd-btn-primary:disabled {
+    background-color: rgba(127, 127, 127, 0.25);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.dd-foldout-header {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.dd-foldout-arrow {
+    width: 12px;
+    margin-right: 4px;
+    font-size: 10px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-left;
+    opacity: 0.8;
+}
+
+.dd-foldout-title {
+    margin-top: 0;
+    margin-bottom: 0;
+    -unity-text-align: middle-left;
+}
+
+.dd-foldout-summary {
+    flex-shrink: 1;
+    margin-left: 8px;
+    font-size: 11px;
+    opacity: 0.55;
+    overflow: hidden;
+    -unity-text-align: middle-left;
+}
+
+.dd-sublabel {
+    font-size: 11px;
+    opacity: 0.7;
+    margin-top: 8px;
+    margin-bottom: 4px;
+}
+
+.dd-labeled {
+    margin-top: 4px;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+/* Aligned form: hide each field's built-in label and use one explicit label column, so every
+   control (text field, toggle, dropdown button) starts at the same x regardless of its type. */
+.dd-form .unity-base-field__label {
+    display: none;
+}
+
+.dd-form .unity-base-field__input {
+    margin-left: 0;
+}
+
+.dd-form-row {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 4px;
+}
+
+.dd-form-label {
+    width: 78px;
+    min-width: 78px;
+    margin-left: 0;
+    margin-right: 0;
+    -unity-text-align: middle-left;
+}
+
+.dd-form-label-sm {
+    width: 40px;
+    min-width: 40px;
+    margin-left: 8px;
+    margin-right: 0;
+    -unity-text-align: middle-left;
+}
+
+.dd-grow {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+    min-width: 0;
+}
+
+.dd-port-input {
+    flex-shrink: 0;
+    width: 74px;
+}
+
+.dd-select {
+    margin-left: 0;
+    -unity-text-align: middle-left;
+}
+
+.dd-modlist {
+    min-height: 46px;
+    max-height: 140px;
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0.25);
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.12);
+}
+
+.dd-mod-row {
+    flex-direction: row;
+    align-items: center;
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+
+.dd-mod-row:hover {
+    background-color: rgba(127, 127, 127, 0.18);
+}
+
+.dd-mod-row-selected {
+    background-color: rgba(0, 71, 171, 0.55);
+}
+
+.dd-mod-row-selected:hover {
+    background-color: rgba(0, 71, 171, 0.55);
+}
+
+.dd-mod-empty {
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    opacity: 0.6;
+    -unity-font-style: italic;
+}
+
+.dd-btn-icon {
+    min-width: 28px;
+    padding-left: 6px;
+    padding-right: 6px;
+    -unity-text-align: middle-center;
+}
+
+.dd-spacer {
+    flex-grow: 1;
+}
+
+.dd-status {
+    font-size: 12px;
+    white-space: normal;
+    margin-top: 2px;
+    margin-bottom: 8px;
+}
+
+.dd-results {
+    margin-top: 2px;
+}
+
+.dd-options {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top-width: 1px;
+    border-top-color: rgba(0, 0, 0, 0.15);
+}

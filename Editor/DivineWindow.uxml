@@ -1,27 +1,92 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
-    <ui:VisualElement name="Root" style="justify-content: flex-start; width: 100%; height: 100%; padding-left: 3px; padding-right: 3px; padding-top: 3px; padding-bottom: 3px;">
-        <ui:Label text="The Divine Dragon will automatically patch your bundles to be compatible with Engage, and then move them into your mod for quick testing." display-tooltip-when-elided="true" name="Readme" style="overflow: visible; flex-wrap: nowrap; flex-basis: auto; white-space: normal; margin-left: 3px; margin-right: 3px; margin-top: 10px; margin-bottom: 10px; height: auto; width: auto;" />
-        <ui:VisualElement name="sdcardpathContainer" style="flex-direction: column; margin-left: 3px; margin-right: 3px; margin-top: 1px; margin-bottom: 10px;">
-            <ui:Label text="sdcard Path" display-tooltip-when-elided="true" name="sdlabel" style="margin-bottom: 5px; font-size: 16px;" />
-            <ui:TextField picking-mode="Ignore" name="SDCardField" usage-hints="None" tooltip="The SD Card path is needed to help locate your engage/mods folder." binding-path="sdCardPath" style="min-width: 50%; margin-top: 0; margin-left: 0; margin-right: 0; margin-bottom: 0;" />
-            <ui:VisualElement name="buttonContainer" style="flex-direction: row; margin-top: 5px; justify-content: flex-end; align-items: auto; width: 100%;">
-                <ui:Button text="Autodetect Path for Ryujinx" display-tooltip-when-elided="true" name="AutodetectRyujinx" tooltip="Attempt to autodetect your Ryujinx sdcard" style="margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0; align-items: auto; white-space: normal;" />
-                <ui:Button text="Browse for sdcard path" display-tooltip-when-elided="true" name="BrowseSDPath" style="margin-bottom: 0; align-items: auto; max-width: none; justify-content: flex-start; right: auto; margin-left: 0; margin-right: 0; margin-top: 0; white-space: normal;" />
+    <ui:ScrollView name="RootScroll" class="dd-scroll">
+    <ui:VisualElement name="Root" class="dd-root">
+        <ui:VisualElement name="header" class="dd-header">
+            <ui:Label text="Divine Builder" name="title" class="dd-title" />
+            <ui:VisualElement name="accent" class="dd-accent" />
+        </ui:VisualElement>
+        <ui:Label text="Patches your built bundles to be compatible with Engage, then copies them into your mod for quick testing." display-tooltip-when-elided="true" name="Readme" class="dd-readme" />
+
+        <ui:VisualElement name="sdcardpathContainer" class="dd-card">
+            <ui:VisualElement name="destHeader" class="dd-dest-header">
+                <ui:Label text="Destination" display-tooltip-when-elided="true" name="sdlabel" class="dd-section dd-dest-title" />
+                <ui:VisualElement name="targetTabs" class="dd-tabs">
+                    <ui:Button text="Ryujinx" display-tooltip-when-elided="true" name="TabRyujinx" tooltip="Ryujinx emulator" class="dd-tab" />
+                    <ui:Button text="Yuzu" display-tooltip-when-elided="true" name="TabYuzu" tooltip="Yuzu emulator" class="dd-tab" />
+                    <ui:Button text="SD·USB" display-tooltip-when-elided="true" name="TabSdUsb" tooltip="SD card or USB mounted on this PC" class="dd-tab" />
+                    <ui:Button text="FTP" display-tooltip-when-elided="true" name="TabFtp" tooltip="Console over the network" class="dd-tab" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="folderTarget">
+                <ui:TextField picking-mode="Ignore" name="SDCardField" tooltip="The SD root that holds your engage/mods folder." binding-path="sdCardPath" class="dd-field" />
+                <ui:VisualElement name="buttonContainer" class="dd-row dd-row-end">
+                    <ui:Button text="Autodetect" display-tooltip-when-elided="true" name="DetectButton" tooltip="Find the destination for the chosen target" class="dd-btn dd-btn-ghost" />
+                    <ui:Button text="Browse…" display-tooltip-when-elided="true" name="BrowseSDPath" tooltip="Pick the destination folder" class="dd-btn dd-btn-ghost" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="ftpTarget" class="dd-form">
+                <ui:VisualElement name="ftpProfileRow" class="dd-form-row">
+                    <ui:Label text="Profile" name="ftpProfileLabel" class="dd-form-label" />
+                    <ui:Button text="sys-ftpd  ▾" display-tooltip-when-elided="true" name="FtpProfileSelect" tooltip="Pick or manage saved connections" class="dd-btn dd-btn-ghost dd-grow dd-select" />
+                </ui:VisualElement>
+                <ui:VisualElement name="ftpHostRow" class="dd-form-row">
+                    <ui:Label text="Host" class="dd-form-label" />
+                    <ui:TextField name="FtpHost" tooltip="The console's IP address" class="dd-grow" />
+                    <ui:Label text="Port" class="dd-form-label-sm" />
+                    <ui:TextField name="FtpPort" tooltip="Default 5000" class="dd-port-input" />
+                </ui:VisualElement>
+                <ui:VisualElement name="ftpAnonRow" class="dd-form-row">
+                    <ui:Label text="Anonymous" class="dd-form-label" />
+                    <ui:Toggle name="FtpAnon" />
+                </ui:VisualElement>
+                <ui:VisualElement name="ftpCreds">
+                    <ui:VisualElement name="ftpUserRow" class="dd-form-row">
+                        <ui:Label text="User" class="dd-form-label" />
+                        <ui:TextField name="FtpUser" class="dd-grow" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="ftpPassRow" class="dd-form-row">
+                        <ui:Label text="Password" class="dd-form-label" />
+                        <ui:TextField name="FtpPass" password="true" class="dd-grow" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement name="ftpButtonContainer" class="dd-row dd-row-end">
+                    <ui:Button text="Test connection" display-tooltip-when-elided="true" name="FtpTest" tooltip="Check that the server is reachable" class="dd-btn dd-btn-ghost" />
+                </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement name="modpathContainer" style="margin-left: 3px; margin-right: 3px; margin-top: 1px; margin-bottom: 10px;">
-            <ui:Label text="Mod Path" display-tooltip-when-elided="true" name="modlabel" style="margin-bottom: 5px; font-size: 16px;" />
-            <ui:TextField picking-mode="Ignore" name="modPathField" usage-hints="None" tooltip="Enter a path directly" binding-path="modPath" style="height: 18px; margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0; border-left-color: rgba(255, 0, 0, 255); border-right-color: rgba(255, 0, 0, 255); border-top-color: rgba(255, 0, 0, 255); border-bottom-color: rgba(255, 0, 0, 255);" />
-            <ui:VisualElement name="buttonContainer" style="align-items: flex-end;">
-                <ui:Button text="Browse for mod path" display-tooltip-when-elided="true" name="BrowseModPath" tooltip="Select the mod folder you want to build to. Zip files are not currently supported." style="margin-bottom: 0; margin-left: 0; margin-right: 0; margin-top: 5px;" />
+
+        <ui:VisualElement name="modpathContainer" class="dd-card">
+            <ui:VisualElement name="modHeader" class="dd-foldout-header">
+                <ui:Label text="▾" name="modFoldArrow" class="dd-foldout-arrow" />
+                <ui:Label text="Mod path" display-tooltip-when-elided="true" name="modlabel" class="dd-section dd-foldout-title" />
+                <ui:Label text="" display-tooltip-when-elided="true" name="modFoldSummary" class="dd-foldout-summary" />
+            </ui:VisualElement>
+            <ui:VisualElement name="modBody">
+            <ui:TextField picking-mode="Ignore" name="modPathField" tooltip="The folder to build into" binding-path="modPath" class="dd-field" />
+            <ui:Label text="Mods in engage/mods" display-tooltip-when-elided="true" name="modListLabel" class="dd-sublabel" />
+            <ui:ScrollView name="modList" class="dd-modlist" />
+            <ui:VisualElement name="buttonContainer" class="dd-row">
+                <ui:Button text="New mod" display-tooltip-when-elided="true" name="AddMod" tooltip="Create a new mod folder in engage/mods" class="dd-btn dd-btn-ghost dd-flush-left" />
+                <ui:Button text="Rename" display-tooltip-when-elided="true" name="RenameMod" tooltip="Rename the selected mod folder" class="dd-btn dd-btn-ghost" />
+                <ui:Button text="Delete" display-tooltip-when-elided="true" name="DeleteMod" tooltip="Delete the selected mod folder" class="dd-btn dd-btn-danger" />
+                <ui:VisualElement name="spacer" class="dd-spacer" />
+                <ui:Button text="Browse…" display-tooltip-when-elided="true" name="BrowseModPath" tooltip="Select any folder to build to. Zip files are not currently supported." class="dd-btn dd-btn-ghost" />
+            </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement name="buildContainer" style="bottom: auto; position: relative; width: 100%; margin-left: 3px; margin-right: 3px; margin-top: 1px; margin-bottom: 1px;">
-            <ui:Label text="Build" display-tooltip-when-elided="true" name="BuildLabel" style="margin-bottom: 5px; font-size: 16px;" />
-            <ui:Label text="Ready to build" display-tooltip-when-elided="true" name="buildStatusLabel" style="color: rgb(0, 255, 70); font-size: 14px;" />
-            <ui:Button text="Build" display-tooltip-when-elided="true" name="BuildAddressablesDivine" style="border-left-color: rgb(0, 71, 171); border-right-color: rgb(0, 71, 171); border-top-color: rgb(0, 71, 171); border-bottom-color: rgb(0, 71, 171); margin-bottom: 3px; margin-left: 0; margin-right: 0; margin-top: 0;" />
-            <ui:Toggle label="Open output folder after build" name="openAfterBuildCheckbox" />
-            <ui:Toggle label="Use legacy Rust patcher" name="useLegacyRustPatcherCheckbox" tooltip="Fall back to the old bundle_tools binary instead of the built-in C# patcher." />
+
+        <ui:VisualElement name="buildContainer" class="dd-card">
+            <ui:Label text="Build" display-tooltip-when-elided="true" name="BuildLabel" class="dd-section" />
+            <ui:Label text="Ready to build" display-tooltip-when-elided="true" name="buildStatusLabel" class="dd-status" />
+            <ui:Button text="Build" display-tooltip-when-elided="true" name="BuildAddressablesDivine" class="dd-btn-primary" />
+            <ui:VisualElement name="buildResults" class="dd-results" />
+            <ui:VisualElement name="buildOptions" class="dd-options">
+                <ui:Toggle label="Open output folder after build" name="openAfterBuildCheckbox" />
+                <ui:Toggle label="Use legacy Rust patcher" name="useLegacyRustPatcherCheckbox" tooltip="Fall back to the old bundle_tools binary instead of the built-in C# patcher." />
+            </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>
+    </ui:ScrollView>
 </ui:UXML>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -24,27 +25,66 @@ namespace DivineDragon
         [MenuItem("Divine Dragon/Build", true, 1500)]
         static bool ValidateBuildAddressables()
         {
-            // Return false if no mod output path is set
-            return !string.IsNullOrEmpty(DivineDragonSettingsScriptableObject.instance.getModPath());
+            var s = DivineDragonSettingsScriptableObject.instance;
+
+            // For FTP, only allow building when we have a mod and the server was last seen reachable.
+            // Uses the cached status, never a live connection (validators run constantly).
+            if (s.getDeliveryTarget() == DeliveryTarget.Ftp)
+            {
+                return !string.IsNullOrEmpty(s.getFtpHost())
+                       && !string.IsNullOrEmpty(s.getFtpModName())
+                       && FtpStatus.IsReachable(s.getFtpHost(), s.getFtpPort());
+            }
+
+            return !string.IsNullOrEmpty(s.getModPath());
         }
 
         private static string dataPath = "Data/StreamingAssets/aa/Switch";
 
         public const string PackageRoot = "Packages/com.divinedragon.builder";
 
-        public static bool BuildAddressableContent()
+        public static BuildOutcome BuildAddressableContent()
         {
-            AddressableAssetSettings
-                .BuildPlayerContent(out AddressablesPlayerBuildResult result);
-            bool success = string.IsNullOrEmpty(result.Error);
+            var outcome = new BuildOutcome();
+            var sw = Stopwatch.StartNew();
+            var settings = DivineDragonSettingsScriptableObject.instance;
+            bool ftp = settings.getDeliveryTarget() == DeliveryTarget.Ftp;
 
-            if (!success)
+            // Check the FTP destination before the expensive build so we fail fast.
+            string ftpModName = null;
+            if (ftp)
             {
-                Debug.LogError("Addressables build error encountered: " + result.Error);
-                return false;
+                if (string.IsNullOrEmpty(settings.getFtpHost()))
+                    return Fail(outcome, sw, "FTP setup", "(ftp)", "Set the FTP host before building.");
+                ftpModName = settings.getFtpModName();
+                if (string.IsNullOrEmpty(ftpModName))
+                    return Fail(outcome, sw, "FTP setup", "(ftp)", "Pick or create a mod to upload to before building.");
             }
 
-            var outputDirectory = BuildModOutputPath();
+            AddressableAssetSettings
+                .BuildPlayerContent(out AddressablesPlayerBuildResult result);
+
+            if (!string.IsNullOrEmpty(result.Error))
+            {
+                Debug.LogError("Addressables build error encountered: " + result.Error);
+                return Fail(outcome, sw, "Addressables build", "(Addressables build)", result.Error);
+            }
+
+            // Local targets build straight into the mod folder. FTP builds into a temp staging
+            // folder that we upload afterwards.
+            string stagingRoot = null;
+            string outputDirectory;
+            if (ftp)
+            {
+                stagingRoot = Path.Combine(Path.GetTempPath(), "DivineBuilderFtp", MakeSafeName(ftpModName));
+                TryDeleteDirectory(stagingRoot);
+                outputDirectory = Path.Combine(stagingRoot, dataPath);
+            }
+            else
+            {
+                outputDirectory = BuildModOutputPath();
+                outcome.OutputDirectory = outputDirectory;
+            }
 
             if (!Directory.Exists(outputDirectory))
             {
@@ -54,24 +94,161 @@ namespace DivineDragon
             string projectCurrentDir = Directory.GetCurrentDirectory();
             string settingsJsonPath = Path.GetFullPath(Path.Combine(projectCurrentDir, result.OutputPath));
 
-            bool patched = DivineDragonSettingsScriptableObject.instance.getUseLegacyRustPatcher()
-                ? RunLegacyPatcher(outputDirectory, settingsJsonPath)
-                : RunPatcher(outputDirectory, settingsJsonPath);
+            if (settings.getUseLegacyRustPatcher())
+            {
+                // The Rust tool doesn't hand back structured results, so we can only assume it worked.
+                RunLegacyPatcher(outputDirectory, settingsJsonPath);
+                outcome.Success = true;
+            }
+            else
+            {
+                var patch = RunPatcher(outputDirectory, settingsJsonPath);
+                outcome.Patched = patch.Patched;
+                outcome.Skipped = patch.Skipped;
+                outcome.Warnings.AddRange(patch.Warnings);
+                outcome.Errors.AddRange(patch.Errors);
+                outcome.Cancelled = patch.Cancelled;
+                outcome.Success = patch.Success;
+                if (patch.Cancelled)
+                    outcome.FailureStage = "cancelled";
+                else if (!patch.Success)
+                    outcome.FailureStage = "patching";
+            }
 
-            if (!patched)
-                return false;
+            if (!outcome.Success)
+            {
+                TryDeleteDirectory(stagingRoot);
+                outcome.ElapsedSeconds = sw.Elapsed.TotalSeconds;
+                return outcome;
+            }
 
             AddressableUtility.RemoveAddressablesWithLabel(outputDirectory, "removePostBuild");
 
-            if (DivineDragonSettingsScriptableObject.instance.getOpenAfterBuild())
+            if (ftp)
+            {
+                bool uploaded = RunFtpUpload(settings, stagingRoot, ftpModName, outcome);
+                TryDeleteDirectory(stagingRoot);
+                if (!uploaded)
+                {
+                    outcome.Success = false;
+                    if (string.IsNullOrEmpty(outcome.FailureStage))
+                        outcome.FailureStage = outcome.Cancelled ? "cancelled" : "FTP upload";
+                    outcome.ElapsedSeconds = sw.Elapsed.TotalSeconds;
+                    return outcome;
+                }
+
+                outcome.DeliveryNote = $"uploaded to ftp://{settings.getFtpHost()}:{settings.getFtpPort()}/" +
+                                       $"{settings.engageModsPath}/{ftpModName}";
+            }
+            else if (settings.getOpenAfterBuild())
             {
                 EditorUtility.RevealInFinder(outputDirectory);
             }
 
+            outcome.ElapsedSeconds = sw.Elapsed.TotalSeconds;
+            return outcome;
+        }
+
+        static BuildOutcome Fail(BuildOutcome outcome, Stopwatch sw, string stage, string where, string detail)
+        {
+            outcome.FailureStage = stage;
+            outcome.Errors.Add(new BuildError
+            {
+                BundlePath = where,
+                Kind = BuildErrorKind.BundleIo,
+                Detail = detail
+            });
+            outcome.ElapsedSeconds = sw.Elapsed.TotalSeconds;
+            return outcome;
+        }
+
+        // Builds live in a temp folder named after the mod, so strip anything not valid in a path.
+        static string MakeSafeName(string name)
+        {
+            foreach (var c in Path.GetInvalidFileNameChars())
+                name = name.Replace(c, '_');
+            return name;
+        }
+
+        static void TryDeleteDirectory(string dir)
+        {
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
+                return;
+            try
+            {
+                Directory.Delete(dir, true);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("Divine Builder: could not clean up staging folder: " + e.Message);
+            }
+        }
+
+        // Uploads the staged build tree to engage/mods/<mod> over FTP, with a cancelable progress bar.
+        static bool RunFtpUpload(DivineDragonSettingsScriptableObject settings, string stagingRoot,
+            string modName, BuildOutcome outcome)
+        {
+            string remoteModDir = settings.engageModsPath.Replace("\\", "/").TrimEnd('/') + "/" + modName;
+            var client = new FtpClient(settings.getFtpHost(), settings.getFtpPort(),
+                settings.getFtpAnonymous(), settings.getFtpUser(), settings.getFtpPassword());
+
+            var files = Directory.GetFiles(stagingRoot, "*", SearchOption.AllDirectories);
+            int total = files.Length;
+            int done = 0;
+            var ensured = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                client.EnsureDirectory(remoteModDir);
+                ensured.Add(remoteModDir);
+
+                foreach (var file in files)
+                {
+                    string rel = file.Substring(stagingRoot.Length).Replace("\\", "/").TrimStart('/');
+                    string remoteFile = remoteModDir + "/" + rel;
+
+                    int slash = remoteFile.LastIndexOf('/');
+                    if (slash > 0)
+                    {
+                        string parent = remoteFile.Substring(0, slash);
+                        if (ensured.Add(parent))
+                            client.EnsureDirectory(parent);
+                    }
+
+                    if (EditorUtility.DisplayCancelableProgressBar("Divine Builder (FTP upload)",
+                        $"{done}/{total}  {rel}", total > 0 ? (float)done / total : 0f))
+                    {
+                        outcome.Cancelled = true;
+                        Debug.LogWarning("Divine Builder: FTP upload cancelled.");
+                        return false;
+                    }
+
+                    client.UploadFile(file, remoteFile);
+                    done++;
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("Divine Builder: FTP upload failed: " + e);
+                outcome.Errors.Add(new BuildError
+                {
+                    BundlePath = "(ftp)",
+                    Kind = BuildErrorKind.BundleIo,
+                    Detail = "FTP upload failed: " + e.Message,
+                    Hint = "Check the host, port and that the server is reachable."
+                });
+                return false;
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+            }
+
+            Debug.Log($"Divine Builder: uploaded {done} file(s) to {remoteModDir}");
             return true;
         }
 
-        static bool RunPatcher(string outputDirectory, string settingsJsonPath)
+        static PatchResult RunPatcher(string outputDirectory, string settingsJsonPath)
         {
             string cacheJson = Path.GetFullPath(Path.Combine(PackageRoot, "PatcherData~/cache.json"));
             string uacJson = Path.GetFullPath(Path.Combine(PackageRoot, "PatcherData~/uac-cache.json"));
@@ -88,7 +265,14 @@ namespace DivineDragon
             catch (Exception e)
             {
                 Debug.LogError($"Divine Builder: patching failed to start: {e}");
-                return false;
+                var failed = new PatchResult();
+                failed.Errors.Add(new BuildError
+                {
+                    BundlePath = "(patcher)",
+                    Kind = BuildErrorKind.BundleIo,
+                    Detail = "Patching failed to start: " + e.Message
+                });
+                return failed;
             }
             finally
             {
@@ -102,20 +286,14 @@ namespace DivineDragon
                 Debug.LogError($"Divine Builder: {err}");
 
             if (result.Cancelled)
-            {
                 Debug.LogWarning("Divine Builder: build cancelled.");
-                return false;
-            }
-
-            if (!result.Success)
-            {
+            else if (!result.Success)
                 Debug.LogError($"Divine Builder: build failed, {result.Errors.Count} bundle(s) had errors. " +
                                "See the messages above.");
-                return false;
-            }
+            else
+                Debug.Log($"Divine Builder: patched {result.Patched} bundle(s), skipped {result.Skipped}.");
 
-            Debug.Log($"Divine Builder: patched {result.Patched} bundle(s), skipped {result.Skipped}.");
-            return true;
+            return result;
         }
 
         static bool RunLegacyPatcher(string outputDirectory, string settingsJsonPath)
@@ -181,6 +359,22 @@ namespace DivineDragon
             }
         }
 
+    }
+
+    // Everything the Build window needs to show after a build, so it doesn't have to send people
+    // digging through the console to find out what happened.
+    public class BuildOutcome
+    {
+        public bool Success;
+        public bool Cancelled;
+        public string FailureStage;
+        public int Patched;
+        public int Skipped;
+        public string OutputDirectory;
+        public string DeliveryNote;
+        public double ElapsedSeconds;
+        public readonly List<BuildError> Errors = new List<BuildError>();
+        public readonly List<string> Warnings = new List<string>();
     }
 
     public class EditorPatchProgress : IProgress<PatchProgress>
