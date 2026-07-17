@@ -591,12 +591,51 @@ namespace DivineDragon
             UpdateModSelection();
         }
 
+        // No automatic connecting here: a LIST on an offline device blocks until the timeout and
+        // freezes the editor. Just offer a button to list on demand.
         private void RefreshFtpModList()
         {
             var s = DivineDragonSettingsScriptableObject.instance;
+            if (string.IsNullOrEmpty(s.getFtpHost()))
+            {
+                modList.Add(MakeModPlaceholder("Set the FTP host to list your mods."));
+                return;
+            }
+
+            var box = new VisualElement();
+            box.style.paddingTop = 8;
+            box.style.paddingBottom = 8;
+            box.style.paddingLeft = 8;
+            box.style.paddingRight = 8;
+
+            var label = new Label("Connect to list the mods on the device.");
+            label.style.whiteSpace = WhiteSpace.Normal;
+            label.style.opacity = 0.7f;
+            box.Add(label);
+
+            var listButton = new Button(ConnectAndListFtpMods) { text = "List mods" };
+            listButton.AddToClassList("dd-btn");
+            listButton.AddToClassList("dd-btn-ghost");
+            listButton.style.alignSelf = Align.FlexStart;
+            listButton.style.marginLeft = 0;
+            listButton.style.marginTop = 6;
+            box.Add(listButton);
+
+            modList.Add(box);
+        }
+
+        // Actually connects and lists, only on an explicit user action (List button, or after an
+        // add/delete/rename/test that already talked to the device).
+        private void ConnectAndListFtpMods()
+        {
+            if (modList == null)
+                return;
+
+            modList.Clear();
+
+            var s = DivineDragonSettingsScriptableObject.instance;
             string host = s.getFtpHost();
             int port = s.getFtpPort();
-
             if (string.IsNullOrEmpty(host))
             {
                 modList.Add(MakeModPlaceholder("Set the FTP host to list your mods."));
@@ -633,7 +672,7 @@ namespace DivineDragon
             names.Sort(StringComparer.OrdinalIgnoreCase);
             if (names.Count == 0)
             {
-                modList.Add(MakeModPlaceholder("No mods yet, use + to create one."));
+                modList.Add(MakeModPlaceholder("No mods yet, use New mod to create one."));
                 UpdateBuildStatus();
                 return;
             }
@@ -682,7 +721,7 @@ namespace DivineDragon
                     EditorUtility.DisplayDialog("Couldn't create folder", e.Message, "OK");
                     return;
                 }
-                RefreshModList();
+                ConnectAndListFtpMods();
                 UpdateBuildStatus();
             })
             {
@@ -864,7 +903,7 @@ namespace DivineDragon
 
                 s.setFtpModName(name);
                 SyncModField();
-                RefreshModList();
+                ConnectAndListFtpMods();
                 UpdateBuildStatus();
             });
         }
@@ -950,7 +989,7 @@ namespace DivineDragon
 
                 s.setFtpModName("");
                 SyncModField();
-                RefreshModList();
+                ConnectAndListFtpMods();
                 UpdateBuildStatus();
             });
         }
@@ -1060,7 +1099,7 @@ namespace DivineDragon
 
                 s.setFtpModName(name);
                 SyncModField();
-                RefreshModList();
+                ConnectAndListFtpMods();
                 UpdateBuildStatus();
             });
         }
@@ -1491,7 +1530,7 @@ namespace DivineDragon
             }
 
             FtpStatus.Set(s.getFtpHost(), s.getFtpPort(), true);
-            RefreshModList();
+            ConnectAndListFtpMods();
             UpdateBuildStatus();
             EditorUtility.DisplayDialog("Connected", "Reached the FTP server at " + s.getFtpHost() + ".", "OK");
         }
@@ -1595,8 +1634,6 @@ namespace DivineDragon
                 string host = s.getFtpHost();
                 string name = s.getFtpModName();
 
-                bool reachable = FtpStatus.IsReachable(host, s.getFtpPort());
-
                 if (string.IsNullOrEmpty(host))
                 {
                     buildStatusLabel.text = "Set the FTP host to upload builds.";
@@ -1607,11 +1644,6 @@ namespace DivineDragon
                     buildStatusLabel.text = "Pick or create a mod to upload to.";
                     buildStatusLabel.style.color = warnAmber;
                 }
-                else if (!reachable)
-                {
-                    buildStatusLabel.text = "FTP server not reachable, test the connection.";
-                    buildStatusLabel.style.color = warnAmber;
-                }
                 else
                 {
                     buildStatusLabel.text = $"Ready to build and upload to {host}.";
@@ -1620,7 +1652,7 @@ namespace DivineDragon
                 }
 
                 if (buildButton != null)
-                    buildButton.SetEnabled(!string.IsNullOrEmpty(host) && !string.IsNullOrEmpty(name) && reachable);
+                    buildButton.SetEnabled(!string.IsNullOrEmpty(host) && !string.IsNullOrEmpty(name));
                 return;
             }
 

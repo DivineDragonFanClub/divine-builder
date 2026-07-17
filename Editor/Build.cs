@@ -19,7 +19,13 @@ namespace DivineDragon
         [MenuItem("Divine Dragon/Build", false, 1500)]
         public static void BuildAddressables()
         {
-            BuildAddressableContent();
+            var outcome = BuildAddressableContent();
+            // The menu has no window to show the result, so surface a failure in a dialog.
+            if (!outcome.Success && !outcome.Cancelled)
+            {
+                string detail = outcome.Errors.Count > 0 ? outcome.Errors[0].Detail : "See the console for details.";
+                EditorUtility.DisplayDialog("Build failed", detail, "OK");
+            }
         }
 
         [MenuItem("Divine Dragon/Build", true, 1500)]
@@ -27,13 +33,11 @@ namespace DivineDragon
         {
             var s = DivineDragonSettingsScriptableObject.instance;
 
-            // For FTP, only allow building when we have a mod and the server was last seen reachable.
-            // Uses the cached status, never a live connection (validators run constantly).
+            // Don't do a live reachability check here (validators run constantly and it would hang).
+            // The build itself pre-flights the FTP device and reports if it can't be reached.
             if (s.getDeliveryTarget() == DeliveryTarget.Ftp)
             {
-                return !string.IsNullOrEmpty(s.getFtpHost())
-                       && !string.IsNullOrEmpty(s.getFtpModName())
-                       && FtpStatus.IsReachable(s.getFtpHost(), s.getFtpPort());
+                return !string.IsNullOrEmpty(s.getFtpHost()) && !string.IsNullOrEmpty(s.getFtpModName());
             }
 
             return !string.IsNullOrEmpty(s.getModPath());
@@ -59,6 +63,23 @@ namespace DivineDragon
                 ftpModName = settings.getFtpModName();
                 if (string.IsNullOrEmpty(ftpModName))
                     return Fail(outcome, sw, "FTP setup", "(ftp)", "Pick or create a mod to upload to before building.");
+
+                // Make sure the device is actually reachable before running a long build we'd only
+                // fail to deliver. Short timeout so an offline device reports quickly.
+                try
+                {
+                    new FtpClient(settings.getFtpHost(), settings.getFtpPort(), settings.getFtpAnonymous(),
+                        settings.getFtpUser(), settings.getFtpPassword(), 4000).TestConnection();
+                    FtpStatus.Set(settings.getFtpHost(), settings.getFtpPort(), true);
+                }
+                catch (Exception e)
+                {
+                    FtpStatus.Set(settings.getFtpHost(), settings.getFtpPort(), false);
+                    Debug.LogError($"Divine Builder: could not reach the FTP device at " +
+                                   $"{settings.getFtpHost()}:{settings.getFtpPort()}. {e.Message}");
+                    return Fail(outcome, sw, "FTP", "(ftp)",
+                        $"Could not reach the FTP device at {settings.getFtpHost()}:{settings.getFtpPort()}.");
+                }
             }
 
             AddressableAssetSettings
