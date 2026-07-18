@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using DivineDragon.Patcher;
 using UnityEditor;
@@ -80,6 +81,39 @@ namespace DivineDragon
                     return Fail(outcome, sw, "FTP", "(ftp)",
                         $"Could not reach the FTP device at {settings.getFtpHost()}:{settings.getFtpPort()}.");
                 }
+            }
+
+            // Validate addressables before the expensive build. With Autofix on, fixable issues
+            // are repaired first; anything still failing afterwards blocks the build.
+            if (settings.getPreBuildAutofix())
+            {
+                var initialIssues = PreFlightCheck.PreFlightCheckManager.RunAllChecks();
+                if (initialIssues.Any(i => i.Rule.CanAutoFix))
+                {
+                    int fixedCount = PreFlightCheck.PreFlightCheckManager.AutoFixAll(initialIssues);
+                    Debug.Log($"Divine Builder: autofixed {fixedCount} pre-flight issue(s).");
+                }
+            }
+
+            var preflightIssues = PreFlightCheck.PreFlightCheckManager.RunAllChecks();
+            if (preflightIssues.Count > 0)
+            {
+                PreFlightCheck.PreflightCheckWindow.ShowWithIssues(preflightIssues);
+                Debug.LogError($"Divine Builder: build cancelled, {preflightIssues.Count} pre-flight issue(s) found. " +
+                               "See the Preflight Check window.");
+                outcome.FailureStage = "pre-flight checks";
+                foreach (var issue in preflightIssues)
+                {
+                    outcome.Errors.Add(new BuildError
+                    {
+                        BundlePath = issue.AssetPath,
+                        Kind = BuildErrorKind.PreFlight,
+                        Detail = issue.Message,
+                        Hint = "Fix it in the Preflight Check window, or enable Autofix."
+                    });
+                }
+                outcome.ElapsedSeconds = sw.Elapsed.TotalSeconds;
+                return outcome;
             }
 
             AddressableAssetSettings

@@ -52,6 +52,8 @@ namespace DivineDragon
 
         [SerializeField] private bool useLegacyRustPatcher;
 
+        [SerializeField] private bool preBuildAutofix;
+
         public string gameCodeAssemblyName = "DivineDragon.GameCode";
 
         [SerializeField] private int deliveryTarget;
@@ -71,6 +73,17 @@ namespace DivineDragon
         public bool getUseLegacyRustPatcher()
         {
             return useLegacyRustPatcher;
+        }
+
+        public void setPreBuildAutofix(bool value)
+        {
+            preBuildAutofix = value;
+            Save(true);
+        }
+
+        public bool getPreBuildAutofix()
+        {
+            return preBuildAutofix;
         }
 
         public void setOpenAfterBuild(bool openAfterBuild)
@@ -294,6 +307,7 @@ namespace DivineDragon
                 rootScroll.horizontalScroller.style.display = DisplayStyle.None;
 
             InitializeOpenAfterBuildCheckbox(divineWindow);
+            InitializeAutofixCheckbox(divineWindow);
             InitializeLegacyPatcherCheckbox(divineWindow);
             InitializeTargetSelector(divineWindow);
             InitializeBrowseSDButton(divineWindow);
@@ -363,6 +377,18 @@ namespace DivineDragon
             openAfterBuildCheckbox.RegisterValueChangedCallback(evt =>
             {
                 DivineDragonSettingsScriptableObject.instance.setOpenAfterBuild(evt.newValue);
+            });
+        }
+
+        private void InitializeAutofixCheckbox(VisualElement divineWindow)
+        {
+            Toggle autofixToggle = divineWindow.Q<Toggle>("autofixCheckbox");
+            if (autofixToggle == null)
+                return;
+            autofixToggle.value = DivineDragonSettingsScriptableObject.instance.getPreBuildAutofix();
+            autofixToggle.RegisterValueChangedCallback(evt =>
+            {
+                DivineDragonSettingsScriptableObject.instance.setPreBuildAutofix(evt.newValue);
             });
         }
 
