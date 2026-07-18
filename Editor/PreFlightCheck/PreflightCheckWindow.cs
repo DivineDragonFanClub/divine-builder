@@ -56,7 +56,6 @@ namespace DivineDragon.PreFlightCheck
             window.lastCheckTime = DateTime.Now;
             window.isChecking = false;
             window.RefreshView();
-            window.Show();
         }
 
         public void CreateGUI()
