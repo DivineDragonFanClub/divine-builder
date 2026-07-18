@@ -1,0 +1,33 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <ui:VisualElement name="Root" class="dd-root pf-root">
+        <ui:VisualElement name="header" class="dd-header">
+            <ui:Label text="Preflight Check" name="title" class="dd-title" />
+            <ui:VisualElement name="accent" class="dd-accent" />
+        </ui:VisualElement>
+        <ui:Label text="Checks your addressables for problems that would break the build in game, and fixes what it can." display-tooltip-when-elided="true" name="Readme" class="dd-readme" />
+
+        <ui:VisualElement name="toolbar" class="pf-toolbar">
+            <ui:Label text="No checks run yet." display-tooltip-when-elided="true" name="statusLabel" class="pf-status" />
+            <ui:VisualElement name="spacer" class="dd-spacer" />
+            <ui:VisualElement name="viewTabs" class="dd-tabs">
+                <ui:Button text="By rule" display-tooltip-when-elided="true" name="TabByRule" tooltip="Group issues by the rule that found them" class="dd-tab" />
+                <ui:Button text="By asset" display-tooltip-when-elided="true" name="TabByAsset" tooltip="Group issues by the asset they were found on" class="dd-tab" />
+            </ui:VisualElement>
+            <ui:Button text="Autofix all" display-tooltip-when-elided="true" name="AutofixAllButton" tooltip="Fix every issue that can be fixed automatically" class="dd-btn dd-btn-accent" style="display: none;" />
+            <ui:Button text="Refresh" display-tooltip-when-elided="true" name="RefreshButton" tooltip="Run the checks again" class="dd-btn dd-btn-ghost" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="rulesCard" class="dd-card">
+            <ui:VisualElement name="rulesHeader" class="dd-foldout-header">
+                <ui:Label text="▸" name="rulesFoldArrow" class="dd-foldout-arrow" />
+                <ui:Label text="Rules" display-tooltip-when-elided="true" name="rulesTitle" class="dd-section dd-foldout-title" />
+                <ui:Label text="" display-tooltip-when-elided="true" name="rulesFoldSummary" class="dd-foldout-summary" />
+            </ui:VisualElement>
+            <ui:VisualElement name="rulesBody" />
+        </ui:VisualElement>
+
+        <ui:ScrollView name="issueScroll" class="pf-issues">
+            <ui:VisualElement name="issueList" />
+        </ui:ScrollView>
+    </ui:VisualElement>
+</ui:UXML>

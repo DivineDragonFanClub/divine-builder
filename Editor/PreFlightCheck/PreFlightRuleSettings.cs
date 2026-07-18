@@ -9,20 +9,13 @@ namespace DivineDragon.PreFlightCheck
     [FilePath("ProjectSettings/DivineDragonPreFlightRules.asset", FilePathAttribute.Location.ProjectFolder)]
     internal class PreFlightRuleSettings : ScriptableSingleton<PreFlightRuleSettings>
     {
-        public enum RuleExecutionMode
-        {
-            Skip = 0,
-            Check = 1,
-            CheckAndAutoApply = 2
-        }
-
         [Serializable]
         internal class RuleState
         {
             public string typeName;
-            public bool enabled = true; // legacy
-            public bool autoApply;      // legacy
-            public RuleExecutionMode mode = RuleExecutionMode.Check;
+            public bool enabled = true;
+            public bool autoApply;  // legacy (version 0)
+            public int mode = 1;    // legacy three-way mode (version 1): 0 skip, 1 check, 2 check+autofix
             public int version;
         }
 
@@ -45,7 +38,6 @@ namespace DivineDragon.PreFlightCheck
             state = new RuleState
             {
                 typeName = key,
-                mode = RuleExecutionMode.Check,
                 version = CurrentVersion
             };
             rules.Add(state);
@@ -53,19 +45,18 @@ namespace DivineDragon.PreFlightCheck
             return state;
         }
 
-        public RuleExecutionMode GetMode(Type ruleType)
+        public bool IsEnabled(Type ruleType)
         {
-            return GetOrCreateState(ruleType).mode;
+            return GetOrCreateState(ruleType).enabled;
         }
 
-        public void SetMode(Type ruleType, RuleExecutionMode mode)
+        public void SetEnabled(Type ruleType, bool enabled)
         {
             var state = GetOrCreateState(ruleType);
-            if (state.mode == mode)
+            if (state.enabled == enabled)
                 return;
 
-            state.mode = mode;
-            state.version = CurrentVersion;
+            state.enabled = enabled;
             Save(true);
         }
 
@@ -82,21 +73,18 @@ namespace DivineDragon.PreFlightCheck
             }
         }
 
-        private const int CurrentVersion = 1;
+        private const int CurrentVersion = 2;
 
         private void UpgradeState(RuleState state)
         {
             if (state.version >= CurrentVersion)
                 return;
 
-            // Legacy conversion from enabled/autoApply
-            if (!state.enabled)
+            // Version 0 stored enabled directly, so it already holds the answer. Version 1
+            // stored a three-way mode where anything but Skip (0) means the rule ran.
+            if (state.version == 1)
             {
-                state.mode = RuleExecutionMode.Skip;
-            }
-            else
-            {
-                state.mode = state.autoApply ? RuleExecutionMode.CheckAndAutoApply : RuleExecutionMode.Check;
+                state.enabled = state.mode != 0;
             }
 
             state.version = CurrentVersion;

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEditor;
 using PackageInfo = UnityEditor.PackageManager.PackageInfo;
 using UnityEngine;
 
@@ -20,7 +19,7 @@ namespace DivineDragon.PreFlightCheck
                 string packageName,
                 string packageDisplayName,
                 string packageVersion,
-                PreFlightRuleSettings.RuleExecutionMode mode,
+                bool enabled,
                 bool canAutoFix)
             {
                 RuleType = ruleType;
@@ -31,7 +30,7 @@ namespace DivineDragon.PreFlightCheck
                 PackageName = packageName;
                 PackageDisplayName = packageDisplayName;
                 PackageVersion = packageVersion;
-                Mode = mode;
+                Enabled = enabled;
                 CanAutoFix = canAutoFix;
             }
 
@@ -43,27 +42,15 @@ namespace DivineDragon.PreFlightCheck
             public string PackageName { get; }
             public string PackageDisplayName { get; }
             public string PackageVersion { get; }
-            public PreFlightRuleSettings.RuleExecutionMode Mode { get; }
+            public bool Enabled { get; }
             public bool CanAutoFix { get; }
-        }
-
-        internal sealed class ActiveRule
-        {
-            public ActiveRule(BuildRule rule, bool autoApply)
-            {
-                Rule = rule;
-                AutoApply = autoApply;
-            }
-
-            public BuildRule Rule { get; }
-            public bool AutoApply { get; }
         }
 
         private class RegisteredRuleEntry
         {
             public Func<BuildRule> Factory;
             public Type RuleType;
-            public PreFlightRuleSettings.RuleExecutionMode Mode = PreFlightRuleSettings.RuleExecutionMode.Check;
+            public bool Enabled = true;
             public bool CanAutoFix;
             public bool MetadataInitialized;
             public string DisplayName;
@@ -108,17 +95,17 @@ namespace DivineDragon.PreFlightCheck
             }
         }
 
-        internal static List<ActiveRule> CreateActiveRules()
+        internal static List<BuildRule> CreateActiveRules()
         {
             lock (SyncRoot)
             {
-                var activeRules = new List<ActiveRule>();
+                var activeRules = new List<BuildRule>();
 
                 foreach (var entry in RegisteredRules)
                 {
                     SyncEntryState(entry);
 
-                    if (entry.Mode == PreFlightRuleSettings.RuleExecutionMode.Skip)
+                    if (!entry.Enabled)
                         continue;
 
                     try
@@ -133,14 +120,7 @@ namespace DivineDragon.PreFlightCheck
                         entry.DefaultSeverity = ruleInstance.DefaultSeverity;
                         entry.MetadataInitialized = true;
 
-                        bool autoApply = entry.Mode == PreFlightRuleSettings.RuleExecutionMode.CheckAndAutoApply && ruleInstance.CanAutoFix;
-                        if (entry.Mode == PreFlightRuleSettings.RuleExecutionMode.CheckAndAutoApply && !ruleInstance.CanAutoFix)
-                        {
-                            entry.Mode = PreFlightRuleSettings.RuleExecutionMode.Check;
-                            PreFlightRuleSettings.instance.SetMode(entry.RuleType, entry.Mode);
-                            autoApply = false;
-                        }
-                        activeRules.Add(new ActiveRule(ruleInstance, autoApply));
+                        activeRules.Add(ruleInstance);
                     }
                     catch (Exception ex)
                     {
@@ -169,12 +149,12 @@ namespace DivineDragon.PreFlightCheck
                     string ruleName = type != null ? type.Name : "Unknown Rule";
                     string ruleDescription = string.Empty;
                     IssueSeverity defaultSeverity = IssueSeverity.Warning;
-                    var mode = PreFlightRuleSettings.RuleExecutionMode.Check;
+                    bool enabled = true;
 
                     if (type != null)
                     {
                         SyncEntryState(entry);
-                        mode = entry.Mode;
+                        enabled = entry.Enabled;
                         EnsureMetadata(entry);
                         canAutoFix = entry.CanAutoFix;
                         if (!string.IsNullOrEmpty(entry.DisplayName))
@@ -202,7 +182,7 @@ namespace DivineDragon.PreFlightCheck
                         packageName,
                         packageDisplayName,
                         packageVersion,
-                        mode,
+                        enabled,
                         canAutoFix));
                 }
 
@@ -210,20 +190,19 @@ namespace DivineDragon.PreFlightCheck
             }
         }
 
-        internal static void SetRuleMode(Type ruleType, PreFlightRuleSettings.RuleExecutionMode mode)
+        internal static void SetRuleEnabled(Type ruleType, bool enabled)
         {
             if (ruleType == null) throw new ArgumentNullException(nameof(ruleType));
 
             lock (SyncRoot)
             {
-                var settings = PreFlightRuleSettings.instance;
-                settings.SetMode(ruleType, mode);
+                PreFlightRuleSettings.instance.SetEnabled(ruleType, enabled);
 
                 foreach (var entry in RegisteredRules)
                 {
                     if (entry.RuleType == ruleType)
                     {
-                        entry.Mode = mode;
+                        entry.Enabled = enabled;
                         break;
                     }
                 }
@@ -257,8 +236,7 @@ namespace DivineDragon.PreFlightCheck
             if (type == null)
                 return;
 
-            var settings = PreFlightRuleSettings.instance;
-            entry.Mode = settings.GetMode(type);
+            entry.Enabled = PreFlightRuleSettings.instance.IsEnabled(type);
         }
 
         private static void EnsureMetadata(RegisteredRuleEntry entry)
@@ -272,11 +250,6 @@ namespace DivineDragon.PreFlightCheck
                 if (prototype != null)
                 {
                     entry.CanAutoFix = prototype.CanAutoFix;
-                    if (!entry.CanAutoFix && entry.Mode == PreFlightRuleSettings.RuleExecutionMode.CheckAndAutoApply)
-                    {
-                        entry.Mode = PreFlightRuleSettings.RuleExecutionMode.Check;
-                        PreFlightRuleSettings.instance.SetMode(entry.RuleType, entry.Mode);
-                    }
                     entry.DisplayName = prototype.Name;
                     entry.Description = prototype.Description;
                     entry.DefaultSeverity = prototype.DefaultSeverity;

@@ -12,24 +12,6 @@ namespace DivineDragon.PreFlightCheck
         private string searchText = string.Empty;
         private Dictionary<string, bool> expandedRules = new Dictionary<string, bool>();
         private Dictionary<string, BuildRule> ruleInstances = new Dictionary<string, BuildRule>();
-        private static readonly GUIContent[] ModeLabelsWithAuto = {
-            new GUIContent("Enabled"),
-            new GUIContent("Auto-fix"),
-            new GUIContent("Disabled")
-        };
-        private static readonly PreFlightRuleSettings.RuleExecutionMode[] ModeValuesWithAuto = {
-            PreFlightRuleSettings.RuleExecutionMode.Check,
-            PreFlightRuleSettings.RuleExecutionMode.CheckAndAutoApply,
-            PreFlightRuleSettings.RuleExecutionMode.Skip
-        };
-        private static readonly GUIContent[] ModeLabelsWithoutAuto = {
-            new GUIContent("Enabled"),
-            new GUIContent("Disabled")
-        };
-        private static readonly PreFlightRuleSettings.RuleExecutionMode[] ModeValuesWithoutAuto = {
-            PreFlightRuleSettings.RuleExecutionMode.Check,
-            PreFlightRuleSettings.RuleExecutionMode.Skip
-        };
 
         private PreFlightRuleSettingsProvider(string path, SettingsScope scope) : base(path, scope)
         {
@@ -175,7 +157,7 @@ namespace DivineDragon.PreFlightCheck
 
             EditorGUILayout.LabelField(info.RuleName ?? "Unknown Rule", titleStyle);
             GUILayout.FlexibleSpace();
-            DrawModeDropdown(info);
+            DrawEnableToggle(info);
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.BeginVertical();
@@ -199,38 +181,13 @@ namespace DivineDragon.PreFlightCheck
             EditorGUILayout.Space(6);
         }
 
-        private void DrawModeDropdown(PreFlightRuleRegistry.RegisteredRuleInfo info)
+        private void DrawEnableToggle(PreFlightRuleRegistry.RegisteredRuleInfo info)
         {
-            var currentMode = info.Mode;
-            if (!info.CanAutoFix && currentMode == PreFlightRuleSettings.RuleExecutionMode.CheckAndAutoApply)
-            {
-                currentMode = PreFlightRuleSettings.RuleExecutionMode.Check;
-                PreFlightRuleRegistry.SetRuleMode(info.RuleType, currentMode);
-            }
-
-            PreFlightRuleSettings.RuleExecutionMode[] values;
-            GUIContent[] labels;
-
-            if (info.CanAutoFix)
-            {
-                values = ModeValuesWithAuto;
-                labels = ModeLabelsWithAuto;
-            }
-            else
-            {
-                values = ModeValuesWithoutAuto;
-                labels = ModeLabelsWithoutAuto;
-            }
-
-            int currentIndex = System.Array.IndexOf(values, currentMode);
-            if (currentIndex < 0) currentIndex = 0;
-
             EditorGUI.BeginChangeCheck();
-            int newIndex = EditorGUILayout.Popup(currentIndex, labels, GUILayout.Width(200));
+            bool enabled = EditorGUILayout.ToggleLeft("Enabled", info.Enabled, GUILayout.Width(70));
             if (EditorGUI.EndChangeCheck())
             {
-                var newMode = values[newIndex];
-                PreFlightRuleRegistry.SetRuleMode(info.RuleType, newMode);
+                PreFlightRuleRegistry.SetRuleEnabled(info.RuleType, enabled);
             }
         }
 
