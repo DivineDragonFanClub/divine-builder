@@ -43,13 +43,14 @@ namespace DivineDragon.PreFlightCheck
         [MenuItem("Divine Dragon/Preflight Check", false, 1510)]
         public static void ShowWindow()
         {
-            var window = GetWindow<PreflightCheckWindow>("Preflight Check");
+            // utility:true makes it a floating window with no dockable tab, matching the builder window.
+            var window = GetWindow<PreflightCheckWindow>(true, "Preflight Check");
             window.minSize = new Vector2(480, 400);
         }
 
         public static void ShowWithIssues(List<BuildIssue> issues)
         {
-            var window = GetWindow<PreflightCheckWindow>("Preflight Check");
+            var window = GetWindow<PreflightCheckWindow>(true, "Preflight Check");
             window.minSize = new Vector2(480, 400);
             window.issues = issues;
             window.lastCheckTime = DateTime.Now;
