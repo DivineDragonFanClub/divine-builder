@@ -411,8 +411,8 @@ namespace DivineDragon
             autofixToggle.RegisterValueChangedCallback(evt =>
             {
                 DivineDragonSettingsScriptableObject.instance.setPreBuildAutofix(evt.newValue);
-                // Fixable errors flip between "will stop the build" and "will be
-                // autofixed" with this checkbox, so both status lines change meaning.
+                // Fixable errors flip between fatal and "will be autofixed" with this
+                // checkbox, so both status lines change meaning.
                 UpdatePreflightBadge();
                 if (!showingBuildOutcome)
                     UpdateBuildStatus();
@@ -1181,7 +1181,7 @@ namespace DivineDragon
 
             modPathField.RegisterValueChangedCallback(evt =>
             {
-                buildButton.SetEnabled(!String.IsNullOrEmpty(evt.newValue));
+                buildButton.SetEnabled(!String.IsNullOrEmpty(evt.newValue) && !PreflightWillBlock());
             });
         }
 
@@ -1687,21 +1687,49 @@ namespace DivineDragon
         private void OnPreflightChecksCompleted(List<BuildIssue> issues)
         {
             UpdatePreflightBadge();
-            // Keep the readiness verdict above the button honest too - but never
-            // overwrite a build report the user is still looking at.
+            // The button's enabled state always tracks the latest check, even while a build
+            // report is on screen - otherwise fixing the blocker wouldn't free the button.
+            RefreshBuildButtonEnabled();
+            // The readiness text, though, must not overwrite a build report the user is
+            // still reading; refresh it only when no outcome is showing.
             if (!showingBuildOutcome)
                 UpdateBuildStatus();
         }
 
-        // Whether the gate would refuse a build right now, as far as the last check knows.
-        private static bool PreflightWillBlock()
+        // Whether the destination/mod config alone is complete enough to build.
+        private bool ConfigAllowsBuild()
+        {
+            if (IsFtp())
+            {
+                var s = DivineDragonSettingsScriptableObject.instance;
+                return !string.IsNullOrEmpty(s.getFtpHost()) && !string.IsNullOrEmpty(s.getFtpModName());
+            }
+
+            string mod = modPathField != null ? modPathField.value : DivineDragonSettingsScriptableObject.instance.getModPath();
+            return !string.IsNullOrEmpty(mod);
+        }
+
+        private void RefreshBuildButtonEnabled()
+        {
+            if (buildButton != null)
+                buildButton.SetEnabled(ConfigAllowsBuild() && !PreflightWillBlock());
+        }
+
+        // How many fatal issues the build can't proceed past right now, as far as the last
+        // check knows. Fixable errors count only while Autofix is off to repair them.
+        private static int PreflightBlockingCount()
         {
             if (!PreflightMonitor.HasRun)
-                return false;
+                return 0;
 
             var tiers = PreFlightCheckManager.CountTiers(PreflightMonitor.LastIssues);
             bool autofixOn = DivineDragonSettingsScriptableObject.instance.getPreBuildAutofix();
-            return PreFlightCheckManager.WillBlockCount(tiers, autofixOn) > 0;
+            return PreFlightCheckManager.WillBlockCount(tiers, autofixOn);
+        }
+
+        private static bool PreflightWillBlock()
+        {
+            return PreflightBlockingCount() > 0;
         }
 
         private void UpdatePreflightBadge()
@@ -1765,7 +1793,8 @@ namespace DivineDragon
                 }
                 else if (PreflightWillBlock())
                 {
-                    buildStatusLabel.text = "Pre-flight will stop this build - see below.";
+                    int blocking = PreflightBlockingCount();
+                    buildStatusLabel.text = $"Can't build - {blocking} fatal issue{(blocking == 1 ? "" : "s")} above.";
                     buildStatusLabel.style.color = errRed;
                     SetFieldBorderColorAndWidth(buildButton, errRed, 1);
                 }
@@ -1776,16 +1805,16 @@ namespace DivineDragon
                     SetFieldBorderColorAndWidth(buildButton, cobaltBlue, 1);
                 }
 
-                if (buildButton != null)
-                    buildButton.SetEnabled(!string.IsNullOrEmpty(host) && !string.IsNullOrEmpty(name));
+                // Blocking pre-flight issues disable the button, not just warn: the gate
+                // would cancel anyway. It re-enables itself when the next check comes back clear.
+                RefreshBuildButtonEnabled();
                 return;
             }
 
             string sd = sdPathField.value;
             string mod = modPathField.value;
 
-            if (buildButton != null)
-                buildButton.SetEnabled(!string.IsNullOrEmpty(mod));
+            RefreshBuildButtonEnabled();
 
             if (string.IsNullOrEmpty(sd))
             {
@@ -1814,7 +1843,8 @@ namespace DivineDragon
             }
             else if (PreflightWillBlock())
             {
-                buildStatusLabel.text = "Pre-flight will stop this build - see below.";
+                int blocking = PreflightBlockingCount();
+                buildStatusLabel.text = $"Can't build - {blocking} fatal issue{(blocking == 1 ? "" : "s")} above.";
                 buildStatusLabel.style.color = errRed;
                 SetFieldBorderColorAndWidth(buildButton, errRed, 1);
             }

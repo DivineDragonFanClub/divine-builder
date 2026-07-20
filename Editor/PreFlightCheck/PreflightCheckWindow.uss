@@ -118,6 +118,11 @@
 }
 
 /* Rules panel */
+.pf-rules-scroll {
+    max-height: 240px;
+    flex-shrink: 0;
+}
+
 .pf-rule-pkg {
     -unity-font-style: bold;
     font-size: 11px;

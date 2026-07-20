@@ -77,17 +77,21 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <ui:VisualElement name="buildContainer" class="dd-card">
-            <ui:Label text="Build" display-tooltip-when-elided="true" name="BuildLabel" class="dd-section" />
-            <ui:Label text="Ready to build" display-tooltip-when-elided="true" name="buildStatusLabel" class="dd-status" />
+        <ui:VisualElement name="validationContainer" class="dd-card">
+            <ui:Label text="Validation" display-tooltip-when-elided="true" name="ValidationLabel" class="dd-section" />
             <ui:VisualElement name="preflightRow" class="dd-status" style="flex-direction: row; flex-wrap: wrap; align-items: center;">
                 <ui:Label text="Checking for issues…" display-tooltip-when-elided="true" name="preflightBadge" tooltip="Live pre-flight check status" style="margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0;" />
                 <ui:Label text="See issues" display-tooltip-when-elided="true" name="preflightSeeIssues" tooltip="Open the Preflight Check window" style="display: none; margin-left: 8px; margin-right: 0; margin-top: 0; margin-bottom: 0; color: rgb(100, 149, 237);" />
             </ui:VisualElement>
+            <ui:Toggle label="Run autofix for issues on build" name="autofixCheckbox" tooltip="Automatically fix fixable issues before building. Fatal issues that remain still block the build; warnings don't." style="margin-top: 2px;" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="buildContainer" class="dd-card">
+            <ui:Label text="Build" display-tooltip-when-elided="true" name="BuildLabel" class="dd-section" />
+            <ui:Label text="Ready to build" display-tooltip-when-elided="true" name="buildStatusLabel" class="dd-status" />
             <ui:Button text="Build" display-tooltip-when-elided="true" name="BuildAddressablesDivine" class="dd-btn-primary" />
             <ui:VisualElement name="buildResults" class="dd-results" />
             <ui:VisualElement name="buildOptions" class="dd-options">
-                <ui:Toggle label="Autofix" name="autofixCheckbox" tooltip="Try to automatically fix pre-flight check issues before building. Checks always run; issues that can't be fixed still stop the build." />
                 <ui:Toggle label="Open output folder after build" name="openAfterBuildCheckbox" />
                 <ui:Toggle label="Use legacy Rust patcher" name="useLegacyRustPatcherCheckbox" tooltip="Fall back to the old bundle_tools binary instead of the built-in C# patcher." />
             </ui:VisualElement>

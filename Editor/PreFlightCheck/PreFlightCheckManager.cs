@@ -179,7 +179,7 @@ namespace DivineDragon.PreFlightCheck
 
             if (willBlock > 0)
             {
-                parts.Add($"{willBlock} issue{(willBlock == 1 ? "" : "s")} will stop the build");
+                parts.Add($"{willBlock} fatal issue{(willBlock == 1 ? "" : "s")}");
                 if (!autofixEnabled && counts.FixableErrors > 0)
                 {
                     parts.Add(counts.FixableErrors == willBlock

@@ -23,7 +23,9 @@
                 <ui:Label text="Rules" display-tooltip-when-elided="true" name="rulesTitle" class="dd-section dd-foldout-title" />
                 <ui:Label text="" display-tooltip-when-elided="true" name="rulesFoldSummary" class="dd-foldout-summary" />
             </ui:VisualElement>
-            <ui:VisualElement name="rulesBody" />
+            <ui:ScrollView name="rulesScroll" class="pf-rules-scroll">
+                <ui:VisualElement name="rulesBody" />
+            </ui:ScrollView>
         </ui:VisualElement>
 
         <ui:ScrollView name="issueScroll" class="pf-issues">

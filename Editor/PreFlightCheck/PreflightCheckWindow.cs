@@ -28,6 +28,7 @@ namespace DivineDragon.PreFlightCheck
         private Button tabByAsset;
         private Button refreshButton;
         private VisualElement rulesHeader;
+        private ScrollView rulesScroll;
         private VisualElement rulesBody;
         private Label rulesFoldArrow;
         private Label rulesFoldSummary;
@@ -110,6 +111,9 @@ namespace DivineDragon.PreFlightCheck
             tabByAsset = content.Q<Button>("TabByAsset");
             refreshButton = content.Q<Button>("RefreshButton");
             rulesHeader = content.Q<VisualElement>("rulesHeader");
+            rulesScroll = content.Q<ScrollView>("rulesScroll");
+            if (rulesScroll != null)
+                rulesScroll.horizontalScroller.style.display = DisplayStyle.None;
             rulesBody = content.Q<VisualElement>("rulesBody");
             rulesFoldArrow = content.Q<Label>("rulesFoldArrow");
             rulesFoldSummary = content.Q<Label>("rulesFoldSummary");
@@ -323,8 +327,8 @@ namespace DivineDragon.PreFlightCheck
             }
 
             if (blockers.Count > 0)
-                issueList.Add(MakeTierCard($"Will block the build ({blockers.Count})", errRed,
-                    "No autofix for these - the build stays cancelled until they're fixed by hand.",
+                issueList.Add(MakeTierCard($"Fatal ({blockers.Count})", errRed,
+                    "The build can't run until these are fixed by hand - there's no autofix for them.",
                     null, blockers));
 
             if (attention.Count > 0)
@@ -581,7 +585,10 @@ namespace DivineDragon.PreFlightCheck
 
         private void ApplyRulesCollapsed(bool collapsed)
         {
-            if (rulesBody != null)
+            // The scroll wrapper is what shows/hides; rulesBody lives inside it.
+            if (rulesScroll != null)
+                rulesScroll.style.display = collapsed ? DisplayStyle.None : DisplayStyle.Flex;
+            else if (rulesBody != null)
                 rulesBody.style.display = collapsed ? DisplayStyle.None : DisplayStyle.Flex;
             if (rulesFoldArrow != null)
                 rulesFoldArrow.text = collapsed ? "▸" : "▾";
