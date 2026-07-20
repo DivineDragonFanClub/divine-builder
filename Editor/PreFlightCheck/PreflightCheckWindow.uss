@@ -85,6 +85,17 @@
     margin-left: 6px;
 }
 
+/* Per-issue jump links (specific material, renderer, …) under the message. */
+.pf-issue-targets {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 2px;
+}
+
+.pf-issue-targets .pf-link {
+    margin-right: 10px;
+}
+
 /* Filename rendered as a link that pings the asset. */
 .pf-link {
     background-color: rgba(0, 0, 0, 0);

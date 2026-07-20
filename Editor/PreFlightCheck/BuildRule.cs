@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace DivineDragon.PreFlightCheck
 {
@@ -10,6 +12,47 @@ namespace DivineDragon.PreFlightCheck
         Error
     }
 
+    /// <summary>
+    /// An optional clickable target on an issue row: a specific object (material,
+    /// renderer, …) to select and ping so the user lands right where the fix goes.
+    /// </summary>
+    public class IssueTarget
+    {
+        public string Label;
+        public Object Target;
+        public string Tooltip;
+
+        public IssueTarget(string label, Object target, string tooltip = null)
+        {
+            Label = label;
+            Target = target;
+            Tooltip = tooltip;
+        }
+    }
+
+    /// <summary>
+    /// An optional one-click resolution on an issue row, run only when the user clicks
+    /// it. Deliberately separate from AutoFix: actions never join the build-time Autofix
+    /// pass or the Fix All button - they exist for judgment-call fixes where a human
+    /// picks the resolution (apply vs revert, and so on).
+    /// </summary>
+    public class IssueAction
+    {
+        public string Label;
+        public string Tooltip;
+
+        /// <summary>Runs the resolution. Return true if something was changed so the
+        /// window knows to re-check; false for a no-op (stale target and the like).</summary>
+        public Func<bool> Execute;
+
+        public IssueAction(string label, Func<bool> execute, string tooltip = null)
+        {
+            Label = label;
+            Execute = execute;
+            Tooltip = tooltip;
+        }
+    }
+
     public class BuildIssue
     {
         public string AssetPath { get; set; }
@@ -18,6 +61,13 @@ namespace DivineDragon.PreFlightCheck
         public Object SpecificComponent { get; set; } // The specific component/object with the issue
         public IssueSeverity Severity { get; set; }
         public BuildRule Rule { get; set; }
+
+        /// <summary>Optional per-issue jump links, rendered as small chips under the message.</summary>
+        public List<IssueTarget> Targets { get; set; }
+
+        /// <summary>Optional one-click resolutions, rendered as buttons on the row.
+        /// Never run automatically - see <see cref="IssueAction"/>.</summary>
+        public List<IssueAction> Actions { get; set; }
         
         public BuildIssue(string assetPath, string message, Object asset, IssueSeverity severity, BuildRule rule, Object specificComponent = null)
         {
@@ -37,7 +87,11 @@ namespace DivineDragon.PreFlightCheck
         public abstract IssueSeverity DefaultSeverity { get; }
         
         /// <summary>
-        /// Validates the given asset and returns any issues found
+        /// Validates the given asset and returns any issues found.
+        /// Checks run automatically and often (on asset imports, window opens, builds),
+        /// so this must be strictly read-only: never open scenes, save assets, or mutate
+        /// any editor state here. Mutations belong in <see cref="AutoFix"/>, which only
+        /// runs when the user asked for it.
         /// </summary>
         /// <param name="assetPath">Path to the asset being validated</param>
         /// <param name="asset">The asset object to validate</param>

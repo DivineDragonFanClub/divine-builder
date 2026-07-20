@@ -5,12 +5,32 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.AddressableAssets;
 using Object = UnityEngine.Object;
+using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace DivineDragon.PreFlightCheck
 {
     public static class PreFlightCheckManager
     {
         private const int MaxIterations = 10;
+
+        /// <summary>Seconds the most recent completed check run took. 0 until a run completes.</summary>
+        public static double LastRunSeconds { get; private set; }
+
+        /// <summary>Addressable assets the most recent completed check run validated.</summary>
+        public static int LastRunAssetCount { get; private set; }
+
+        /// <summary>
+        /// Fires after every completed check run with the fresh issue list. Guarded runs
+        /// (play mode, no rules, no addressable settings) don't fire it.
+        /// </summary>
+        public static event Action<List<BuildIssue>> ChecksCompleted;
+
+        /// <summary>
+        /// True while a run is scanning. Loading assets during the scan can itself raise
+        /// import/modification events; the monitor uses this to tell those apart from
+        /// real edits, otherwise every sweep would schedule the next one forever.
+        /// </summary>
+        public static bool IsRunning { get; private set; }
 
         // Markers for rules that validate something project-wide instead of a single addressable.
         private static readonly string[] SpecialCheckMarkers = { "SCENE_CHECK", "ADDRESSABLE_PATH_CHECK" };
@@ -21,6 +41,10 @@ namespace DivineDragon.PreFlightCheck
         /// </summary>
         public static List<BuildIssue> RunAllChecks()
         {
+            // Timed so we can judge whether validation is cheap enough to run continuously.
+            // Guarded early returns below don't count as a run and leave the stats untouched.
+            var stopwatch = Stopwatch.StartNew();
+
             if (EditorApplication.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode)
             {
                 Debug.LogWarning("Pre-flight checks are disabled while the Editor is in play mode.");
@@ -44,60 +68,164 @@ namespace DivineDragon.PreFlightCheck
             }
 
             var allIssues = new List<BuildIssue>();
+            int assetsChecked = 0;
 
-            // Run the per-asset rules against every addressable entry.
-            foreach (var group in settings.groups)
+            IsRunning = true;
+            try
             {
-                if (group == null) continue;
-
-                foreach (var entry in group.entries)
+                // Run the per-asset rules against every addressable entry.
+                foreach (var group in settings.groups)
                 {
-                    if (entry == null) continue;
+                    if (group == null) continue;
 
-                    string assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
-                    if (string.IsNullOrEmpty(assetPath)) continue;
-
-                    Object asset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
-                    if (asset == null) continue;
-
-                    foreach (var rule in activeRules)
+                    foreach (var entry in group.entries)
                     {
-                        if (!rule.AppliesTo(assetPath, asset))
+                        if (entry == null) continue;
+
+                        string assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
+                        if (string.IsNullOrEmpty(assetPath)) continue;
+
+                        Object asset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
+                        if (asset == null) continue;
+
+                        assetsChecked++;
+
+                        foreach (var rule in activeRules)
+                        {
+                            if (!rule.AppliesTo(assetPath, asset))
+                                continue;
+
+                            try
+                            {
+                                allIssues.AddRange(rule.Validate(assetPath, asset));
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception while validating '{assetPath}': {ex}");
+                            }
+                        }
+                    }
+                }
+
+                // Run the project-wide rules once each.
+                foreach (var rule in activeRules)
+                {
+                    foreach (var marker in SpecialCheckMarkers)
+                    {
+                        if (!rule.AppliesTo(marker, null))
                             continue;
 
                         try
                         {
-                            allIssues.AddRange(rule.Validate(assetPath, asset));
+                            allIssues.AddRange(rule.Validate(marker, null));
                         }
                         catch (Exception ex)
                         {
-                            Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception while validating '{assetPath}': {ex}");
+                            Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception during {marker}: {ex}");
                         }
                     }
                 }
             }
-
-            // Run the project-wide rules once each.
-            foreach (var rule in activeRules)
+            finally
             {
-                foreach (var marker in SpecialCheckMarkers)
-                {
-                    if (!rule.AppliesTo(marker, null))
-                        continue;
+                IsRunning = false;
+            }
 
-                    try
-                    {
-                        allIssues.AddRange(rule.Validate(marker, null));
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception during {marker}: {ex}");
-                    }
+            LastRunSeconds = stopwatch.Elapsed.TotalSeconds;
+            LastRunAssetCount = assetsChecked;
+
+            // No log line here: checks run automatically while a window is watching, and the
+            // results (including the run cost) are shown in the UI instead.
+            ChecksCompleted?.Invoke(allIssues);
+            return allIssues;
+        }
+
+        public static string FormatDuration(double seconds)
+        {
+            return seconds >= 1 ? $"{seconds:0.0} s" : $"{seconds * 1000:0} ms";
+        }
+
+        // The three build-time behaviors, counted for badges and summaries: blocking issues
+        // cancel the build, attention issues ride along as warnings, fixable ones are
+        // cleared by Autofix. Info is none of those.
+        public struct TierCounts
+        {
+            public int Blocking;      // error severity, no autofix
+            public int Attention;     // warning severity, no autofix
+            public int Fixable;       // anything the rule can autofix
+            public int FixableErrors; // the subset of Fixable that blocks when Autofix is off
+            public int Info;
+        }
+
+        public static TierCounts CountTiers(List<BuildIssue> issues)
+        {
+            var counts = new TierCounts();
+            foreach (var issue in issues)
+            {
+                if (issue.Rule.CanAutoFix)
+                {
+                    counts.Fixable++;
+                    if (issue.Severity == IssueSeverity.Error)
+                        counts.FixableErrors++;
+                }
+                else if (issue.Severity == IssueSeverity.Error)
+                    counts.Blocking++;
+                else if (issue.Severity == IssueSeverity.Warning)
+                    counts.Attention++;
+                else
+                    counts.Info++;
+            }
+            return counts;
+        }
+
+        /// <summary>
+        /// How many issues the build gate would refuse over, given the Autofix setting:
+        /// fixable errors stop being blockers when Autofix will repair them first.
+        /// </summary>
+        public static int WillBlockCount(TierCounts counts, bool autofixEnabled)
+        {
+            return counts.Blocking + (autofixEnabled ? 0 : counts.FixableErrors);
+        }
+
+        public static string SummarizeTiers(TierCounts counts, bool autofixEnabled)
+        {
+            int willBlock = WillBlockCount(counts, autofixEnabled);
+            var parts = new List<string>();
+
+            if (willBlock > 0)
+            {
+                parts.Add($"{willBlock} issue{(willBlock == 1 ? "" : "s")} will stop the build");
+                if (!autofixEnabled && counts.FixableErrors > 0)
+                {
+                    parts.Add(counts.FixableErrors == willBlock
+                        ? "enable Autofix to fix them"
+                        : $"enable Autofix to fix {counts.FixableErrors} of them");
                 }
             }
 
-            Debug.Log($"Pre-flight check complete. Found {allIssues.Count} issues.");
-            return allIssues;
+            if (counts.Attention > 0)
+            {
+                parts.Add($"{counts.Attention} issue{(counts.Attention == 1 ? "" : "s")} " +
+                          $"need{(counts.Attention == 1 ? "s" : "")} attention");
+            }
+
+            if (autofixEnabled)
+            {
+                if (counts.Fixable > 0)
+                    parts.Add($"{counts.Fixable} issue{(counts.Fixable == 1 ? "" : "s")} will be autofixed on build");
+            }
+            else
+            {
+                // Fixable errors were already covered by the "enable Autofix" hint above.
+                int fixableWarnings = counts.Fixable - counts.FixableErrors;
+                if (fixableWarnings > 0)
+                    parts.Add($"{fixableWarnings} issue{(fixableWarnings == 1 ? "" : "s")} can be autofixed");
+            }
+
+            if (counts.Info > 0)
+                parts.Add($"{counts.Info} info");
+
+            return parts.Count == 0 ? "No issues found" : string.Join(" · ", parts);
         }
 
         public static bool HasErrors(List<BuildIssue> issues)

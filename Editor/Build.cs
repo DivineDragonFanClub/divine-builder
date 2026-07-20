@@ -84,7 +84,8 @@ namespace DivineDragon
             }
 
             // Validate addressables before the expensive build. With Autofix on, fixable issues
-            // are repaired first; anything still failing afterwards blocks the build.
+            // are repaired first. Of whatever remains, only error-severity issues block the
+            // build; warnings ride along on the outcome so the report shows them.
             if (settings.getPreBuildAutofix())
             {
                 var initialIssues = PreFlightCheck.PreFlightCheckManager.RunAllChecks();
@@ -96,20 +97,31 @@ namespace DivineDragon
             }
 
             var preflightIssues = PreFlightCheck.PreFlightCheckManager.RunAllChecks();
-            if (preflightIssues.Count > 0)
+            var preflightErrors = preflightIssues
+                .Where(i => i.Severity == PreFlightCheck.IssueSeverity.Error).ToList();
+            foreach (var issue in preflightIssues.Where(i => i.Severity == PreFlightCheck.IssueSeverity.Warning))
+            {
+                string warning = $"Pre-flight: {issue.AssetPath}: {issue.Message}";
+                outcome.Warnings.Add(warning);
+                Debug.LogWarning($"Divine Builder: {warning}");
+            }
+
+            if (preflightErrors.Count > 0)
             {
                 PreFlightCheck.PreflightCheckWindow.ShowWithIssues(preflightIssues);
-                Debug.LogError($"Divine Builder: build cancelled, {preflightIssues.Count} pre-flight issue(s) found. " +
+                Debug.LogError($"Divine Builder: build cancelled, {preflightErrors.Count} pre-flight error(s) found. " +
                                "See the Preflight Check window.");
                 outcome.FailureStage = "pre-flight checks";
-                foreach (var issue in preflightIssues)
+                foreach (var issue in preflightErrors)
                 {
                     outcome.Errors.Add(new BuildError
                     {
                         BundlePath = issue.AssetPath,
                         Kind = BuildErrorKind.PreFlight,
                         Detail = issue.Message,
-                        Hint = "Fix it in the Preflight Check window, or enable Autofix."
+                        Hint = issue.Rule.CanAutoFix
+                            ? "Fix it in the Preflight Check window, or enable Autofix."
+                            : "Fix it in the Preflight Check window."
                     });
                 }
                 outcome.ElapsedSeconds = sw.Elapsed.TotalSeconds;

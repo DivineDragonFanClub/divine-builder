@@ -10,10 +10,10 @@
             <ui:Label text="No checks run yet." display-tooltip-when-elided="true" name="statusLabel" class="pf-status" />
             <ui:VisualElement name="spacer" class="dd-spacer" />
             <ui:VisualElement name="viewTabs" class="dd-tabs">
+                <ui:Button text="By status" display-tooltip-when-elided="true" name="TabByStatus" tooltip="Group issues by what happens to the build" class="dd-tab" />
                 <ui:Button text="By rule" display-tooltip-when-elided="true" name="TabByRule" tooltip="Group issues by the rule that found them" class="dd-tab" />
                 <ui:Button text="By asset" display-tooltip-when-elided="true" name="TabByAsset" tooltip="Group issues by the asset they were found on" class="dd-tab" />
             </ui:VisualElement>
-            <ui:Button text="Autofix all" display-tooltip-when-elided="true" name="AutofixAllButton" tooltip="Fix every issue that can be fixed automatically" class="dd-btn dd-btn-accent" style="display: none;" />
             <ui:Button text="Refresh" display-tooltip-when-elided="true" name="RefreshButton" tooltip="Run the checks again" class="dd-btn dd-btn-ghost" />
         </ui:VisualElement>
 

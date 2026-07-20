@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using DivineDragon.Patcher;
+using DivineDragon.PreFlightCheck;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -239,6 +240,11 @@ namespace DivineDragon
         private TextField sdPathField;
         private TextField modPathField;
         private Label buildStatusLabel;
+        private Label preflightBadge;
+        private Label preflightSeeIssues;
+        // True while buildStatusLabel shows a build outcome; live preflight updates must
+        // not overwrite that with a fresh readiness verdict.
+        private bool showingBuildOutcome;
         private VisualElement buildResults;
         private ScrollView modList;
         private Button tabRyujinx;
@@ -272,8 +278,9 @@ namespace DivineDragon
         [MenuItem("Divine Dragon/Divine Dragon Window #%d", false, 1501)]
         public static void ShowSettings()
         {
-            // utility:true makes it a floating window with no dockable tab, matching the dumper.
-            var wnd = GetWindow<SettingsWindow>(true, "Divine Builder");
+            // A regular window (not utility) so it can dock and sit behind other windows
+            // instead of floating on top of everything.
+            var wnd = GetWindow<SettingsWindow>("Divine Builder");
             // Low floor so the window can auto-fit down to collapsed content, width kept comfortable.
             wnd.minSize = new Vector2(340, 200);
             var p = wnd.position;
@@ -290,6 +297,10 @@ namespace DivineDragon
             // Import UXML
             var visualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>
                 ("Packages/com.divinedragon.builder/Editor/DivineWindow.uxml");
+            // Layout restore at editor startup can run before the package is imported;
+            // leave the window blank rather than throwing, a reopen rebuilds it.
+            if (visualTree == null)
+                return;
             VisualElement divineWindow = visualTree.CloneTree();
             root.Add(divineWindow);
             // The cloned tree wrapper needs to fill the window so the ScrollView inside can too.
@@ -321,6 +332,7 @@ namespace DivineDragon
             InitializeBuildButton(divineWindow);
             InitializeBuildResults(divineWindow);
             InitializeBuildStatusLabel(divineWindow);
+            InitializePreflightBadge(divineWindow);
 
             // Everything exists now, so paint the target-specific layout once.
             UpdateTargetTabs();
@@ -334,6 +346,16 @@ namespace DivineDragon
             autoFitRoot = divineWindow.Q<VisualElement>("Root");
             if (autoFitRoot != null)
                 autoFitRoot.RegisterCallback<GeometryChangedEvent>(evt => FitWindowToContent());
+
+            // The builder window counts as a preflight watcher: results stay live while it's
+            // open so the badge can warn before the Build click.
+            PreFlightCheckManager.ChecksCompleted += OnPreflightChecksCompleted;
+            PreflightMonitor.EnsureFresh();
+        }
+
+        public void OnDisable()
+        {
+            PreFlightCheckManager.ChecksCompleted -= OnPreflightChecksCompleted;
         }
 
         private void FitWindowToContent()
@@ -389,6 +411,11 @@ namespace DivineDragon
             autofixToggle.RegisterValueChangedCallback(evt =>
             {
                 DivineDragonSettingsScriptableObject.instance.setPreBuildAutofix(evt.newValue);
+                // Fixable errors flip between "will stop the build" and "will be
+                // autofixed" with this checkbox, so both status lines change meaning.
+                UpdatePreflightBadge();
+                if (!showingBuildOutcome)
+                    UpdateBuildStatus();
             });
         }
 
@@ -1645,8 +1672,74 @@ namespace DivineDragon
             modPathField.RegisterValueChangedCallback(evt => UpdateBuildStatus());
         }
 
+        private void InitializePreflightBadge(VisualElement divineWindow)
+        {
+            preflightBadge = divineWindow.Q<Label>("preflightBadge");
+            preflightSeeIssues = divineWindow.Q<Label>("preflightSeeIssues");
+            if (preflightBadge == null)
+                return;
+
+            preflightBadge.AddManipulator(new Clickable(PreflightCheckWindow.ShowWindow));
+            preflightSeeIssues?.AddManipulator(new Clickable(PreflightCheckWindow.ShowWindow));
+            UpdatePreflightBadge();
+        }
+
+        private void OnPreflightChecksCompleted(List<BuildIssue> issues)
+        {
+            UpdatePreflightBadge();
+            // Keep the readiness verdict above the button honest too - but never
+            // overwrite a build report the user is still looking at.
+            if (!showingBuildOutcome)
+                UpdateBuildStatus();
+        }
+
+        // Whether the gate would refuse a build right now, as far as the last check knows.
+        private static bool PreflightWillBlock()
+        {
+            if (!PreflightMonitor.HasRun)
+                return false;
+
+            var tiers = PreFlightCheckManager.CountTiers(PreflightMonitor.LastIssues);
+            bool autofixOn = DivineDragonSettingsScriptableObject.instance.getPreBuildAutofix();
+            return PreFlightCheckManager.WillBlockCount(tiers, autofixOn) > 0;
+        }
+
+        private void UpdatePreflightBadge()
+        {
+            if (preflightBadge == null)
+                return;
+
+            if (!PreflightMonitor.HasRun)
+            {
+                preflightBadge.text = "Checking for issues…";
+                preflightBadge.style.color = new StyleColor(StyleKeyword.Null);
+                if (preflightSeeIssues != null)
+                    preflightSeeIssues.style.display = DisplayStyle.None;
+                return;
+            }
+
+            var issues = PreflightMonitor.LastIssues;
+            if (issues.Count == 0)
+            {
+                preflightBadge.text = "No issues found.";
+                preflightBadge.style.color = okGreen;
+                if (preflightSeeIssues != null)
+                    preflightSeeIssues.style.display = DisplayStyle.None;
+                return;
+            }
+
+            bool autofixOn = DivineDragonSettingsScriptableObject.instance.getPreBuildAutofix();
+            var tiers = PreFlightCheckManager.CountTiers(issues);
+            preflightBadge.text = PreFlightCheckManager.SummarizeTiers(tiers, autofixOn);
+            preflightBadge.style.color =
+                PreFlightCheckManager.WillBlockCount(tiers, autofixOn) > 0 ? errRed : warnAmber;
+            if (preflightSeeIssues != null)
+                preflightSeeIssues.style.display = DisplayStyle.Flex;
+        }
+
         private void UpdateBuildStatus()
         {
+            showingBuildOutcome = false;
             SetFieldBorderColorAndWidth(sdPathField, Color.clear, 1);
             SetFieldBorderColorAndWidth(modPathField, Color.clear, 1);
             SetFieldBorderColorAndWidth(buildButton, Color.clear, 1);
@@ -1669,6 +1762,12 @@ namespace DivineDragon
                 {
                     buildStatusLabel.text = "Pick or create a mod to upload to.";
                     buildStatusLabel.style.color = warnAmber;
+                }
+                else if (PreflightWillBlock())
+                {
+                    buildStatusLabel.text = "Pre-flight will stop this build - see below.";
+                    buildStatusLabel.style.color = errRed;
+                    SetFieldBorderColorAndWidth(buildButton, errRed, 1);
                 }
                 else
                 {
@@ -1713,6 +1812,12 @@ namespace DivineDragon
                 buildStatusLabel.style.color = warnAmber;
                 SetFieldBorderColorAndWidth(modPathField, cobaltBlue, 1);
             }
+            else if (PreflightWillBlock())
+            {
+                buildStatusLabel.text = "Pre-flight will stop this build - see below.";
+                buildStatusLabel.style.color = errRed;
+                SetFieldBorderColorAndWidth(buildButton, errRed, 1);
+            }
             else
             {
                 buildStatusLabel.text = "Ready to build.";
@@ -1723,6 +1828,7 @@ namespace DivineDragon
 
         private void RenderBuildOutcome(BuildOutcome outcome)
         {
+            showingBuildOutcome = true;
             buildResults?.Clear();
 
             if (outcome.Cancelled)

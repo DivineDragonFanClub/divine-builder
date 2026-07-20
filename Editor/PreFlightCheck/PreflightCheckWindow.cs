@@ -12,6 +12,7 @@ namespace DivineDragon.PreFlightCheck
     {
         private enum ViewMode
         {
+            ByStatus,
             ByRule,
             ByAsset
         }
@@ -19,12 +20,12 @@ namespace DivineDragon.PreFlightCheck
         private List<BuildIssue> issues = new List<BuildIssue>();
         private DateTime lastCheckTime = DateTime.MinValue;
         private bool isChecking;
-        private ViewMode currentViewMode = ViewMode.ByRule;
+        private ViewMode currentViewMode = ViewMode.ByStatus;
 
         private Label statusLabel;
+        private Button tabByStatus;
         private Button tabByRule;
         private Button tabByAsset;
-        private Button autofixAllButton;
         private Button refreshButton;
         private VisualElement rulesHeader;
         private VisualElement rulesBody;
@@ -43,14 +44,15 @@ namespace DivineDragon.PreFlightCheck
         [MenuItem("Divine Dragon/Preflight Check", false, 1510)]
         public static void ShowWindow()
         {
-            // utility:true makes it a floating window with no dockable tab, matching the builder window.
-            var window = GetWindow<PreflightCheckWindow>(true, "Preflight Check");
+            // A regular window (not utility) so it can dock and sit behind other windows
+            // instead of floating on top of everything.
+            var window = GetWindow<PreflightCheckWindow>("Preflight Check");
             window.minSize = new Vector2(480, 400);
         }
 
         public static void ShowWithIssues(List<BuildIssue> issues)
         {
-            var window = GetWindow<PreflightCheckWindow>(true, "Preflight Check");
+            var window = GetWindow<PreflightCheckWindow>("Preflight Check");
             window.minSize = new Vector2(480, 400);
             window.issues = issues;
             window.lastCheckTime = DateTime.Now;
@@ -58,10 +60,34 @@ namespace DivineDragon.PreFlightCheck
             window.RefreshView();
         }
 
+        public void OnEnable()
+        {
+            // Live results: any completed run (auto sweep, build gate, Refresh) lands here.
+            PreFlightCheckManager.ChecksCompleted += OnChecksCompleted;
+        }
+
+        public void OnDisable()
+        {
+            PreFlightCheckManager.ChecksCompleted -= OnChecksCompleted;
+        }
+
+        private void OnChecksCompleted(List<BuildIssue> fresh)
+        {
+            issues = fresh;
+            lastCheckTime = DateTime.Now;
+            isChecking = false;
+            RebuildRulesPanel();
+            RefreshView();
+        }
+
         public void CreateGUI()
         {
             var visualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(
                 Build.PackageRoot + "/Editor/PreFlightCheck/PreflightCheckWindow.uxml");
+            // Layout restore at editor startup can run before the package is imported;
+            // leave the window blank rather than throwing, a reopen rebuilds it.
+            if (visualTree == null)
+                return;
             VisualElement content = visualTree.CloneTree();
             rootVisualElement.Add(content);
             content.style.flexGrow = 1;
@@ -79,9 +105,9 @@ namespace DivineDragon.PreFlightCheck
             }
 
             statusLabel = content.Q<Label>("statusLabel");
+            tabByStatus = content.Q<Button>("TabByStatus");
             tabByRule = content.Q<Button>("TabByRule");
             tabByAsset = content.Q<Button>("TabByAsset");
-            autofixAllButton = content.Q<Button>("AutofixAllButton");
             refreshButton = content.Q<Button>("RefreshButton");
             rulesHeader = content.Q<VisualElement>("rulesHeader");
             rulesBody = content.Q<VisualElement>("rulesBody");
@@ -93,9 +119,9 @@ namespace DivineDragon.PreFlightCheck
             if (issueScroll != null)
                 issueScroll.horizontalScroller.style.display = DisplayStyle.None;
 
+            tabByStatus.clickable.clicked += () => SelectView(ViewMode.ByStatus);
             tabByRule.clickable.clicked += () => SelectView(ViewMode.ByRule);
             tabByAsset.clickable.clicked += () => SelectView(ViewMode.ByAsset);
-            autofixAllButton.clickable.clicked += () => AutofixIssues(issues);
             refreshButton.clickable.clicked += RefreshIssues;
 
             ApplyRulesCollapsed(EditorPrefs.GetBool(RulesCollapsedPref, true));
@@ -109,12 +135,16 @@ namespace DivineDragon.PreFlightCheck
             // Keep the "last checked" relative time reading true while the window sits open.
             rootVisualElement.schedule.Execute(UpdateStatus).Every(1000);
 
+            // Adopt what the monitor already knows, then let it re-sweep if anything is stale.
+            if (lastCheckTime == DateTime.MinValue && PreflightMonitor.HasRun)
+            {
+                issues = PreflightMonitor.LastIssues;
+                lastCheckTime = PreflightMonitor.LastCheckTime;
+            }
+
             RebuildRulesPanel();
             RefreshView();
-
-            // Nothing checked yet this session (or since the last recompile), so check now.
-            if (lastCheckTime == DateTime.MinValue && !isChecking)
-                RefreshIssues();
+            PreflightMonitor.EnsureFresh();
         }
 
         private void SelectView(ViewMode mode)
@@ -135,11 +165,14 @@ namespace DivineDragon.PreFlightCheck
                 if (this == null || !isChecking)
                     return;
 
-                issues = PreFlightCheckManager.RunAllChecks();
-                lastCheckTime = DateTime.Now;
-                isChecking = false;
-                RebuildRulesPanel();
-                RefreshView();
+                // Results come back through ChecksCompleted. If the run was guarded
+                // (play mode and friends) no event fires, so stop the spinner here.
+                PreFlightCheckManager.RunAllChecks();
+                if (this != null && isChecking)
+                {
+                    isChecking = false;
+                    RefreshView();
+                }
             };
         }
 
@@ -163,14 +196,13 @@ namespace DivineDragon.PreFlightCheck
             UpdateStatus();
 
             refreshButton.SetEnabled(!isChecking);
-            bool showAutofixAll = !isChecking && issues.Any(i => i.Rule.CanAutoFix);
-            autofixAllButton.style.display = showAutofixAll ? DisplayStyle.Flex : DisplayStyle.None;
 
             RebuildIssueList();
         }
 
         private void UpdateTabs()
         {
+            SetTabActive(tabByStatus, currentViewMode == ViewMode.ByStatus);
             SetTabActive(tabByRule, currentViewMode == ViewMode.ByRule);
             SetTabActive(tabByAsset, currentViewMode == ViewMode.ByAsset);
         }
@@ -202,15 +234,30 @@ namespace DivineDragon.PreFlightCheck
             }
             else if (issues.Count == 0)
             {
-                statusLabel.text = $"No issues · checked {TimeFormatter.GetRelativeTimeWithTimestamp(lastCheckTime)}";
+                statusLabel.text = $"No issues · checked {TimeFormatter.GetRelativeTimeWithTimestamp(lastCheckTime)}" +
+                                   RunCostSuffix();
                 statusLabel.style.color = okGreen;
             }
             else
             {
-                statusLabel.text = $"{issues.Count} issue{(issues.Count == 1 ? "" : "s")} · checked " +
-                                   TimeFormatter.GetRelativeTimeWithTimestamp(lastCheckTime);
-                statusLabel.style.color = PreFlightCheckManager.HasErrors(issues) ? errRed : warnAmber;
+                bool autofixOn = DivineDragonSettingsScriptableObject.instance.getPreBuildAutofix();
+                var tiers = PreFlightCheckManager.CountTiers(issues);
+                statusLabel.text = $"{PreFlightCheckManager.SummarizeTiers(tiers, autofixOn)} · checked " +
+                                   TimeFormatter.GetRelativeTimeWithTimestamp(lastCheckTime) + RunCostSuffix();
+                statusLabel.style.color = PreFlightCheckManager.WillBlockCount(tiers, autofixOn) > 0 ? errRed : warnAmber;
             }
+        }
+
+        // How much the last full check cost, so we can judge whether continuous validation
+        // would be affordable. Empty until a run has completed in this editor session.
+        private static string RunCostSuffix()
+        {
+            if (PreFlightCheckManager.LastRunSeconds <= 0)
+                return "";
+
+            int count = PreFlightCheckManager.LastRunAssetCount;
+            return $" · {count} asset{(count == 1 ? "" : "s")} in " +
+                   PreFlightCheckManager.FormatDuration(PreFlightCheckManager.LastRunSeconds);
         }
 
         private void RebuildIssueList()
@@ -231,11 +278,13 @@ namespace DivineDragon.PreFlightCheck
 
             if (issues.Count == 0)
             {
-                issueList.Add(MakeEmptyCard("No issues found — your build is ready."));
+                issueList.Add(MakeEmptyCard("No issues found - your build is ready."));
                 return;
             }
 
-            if (currentViewMode == ViewMode.ByRule)
+            if (currentViewMode == ViewMode.ByStatus)
+                BuildByStatusView();
+            else if (currentViewMode == ViewMode.ByRule)
                 BuildByRuleView();
             else
                 BuildByAssetView();
@@ -249,6 +298,86 @@ namespace DivineDragon.PreFlightCheck
             var label = new Label(message);
             label.AddToClassList("pf-empty");
             card.Add(label);
+            return card;
+        }
+
+        // Groups issues by what happens at build time, so the default tab answers
+        // "can I build, and what should I look at first."
+        private void BuildByStatusView()
+        {
+            var blockers = new List<BuildIssue>();
+            var attention = new List<BuildIssue>();
+            var fixable = new List<BuildIssue>();
+            var infos = new List<BuildIssue>();
+
+            foreach (var issue in issues)
+            {
+                if (issue.Rule.CanAutoFix)
+                    fixable.Add(issue);
+                else if (issue.Severity == IssueSeverity.Error)
+                    blockers.Add(issue);
+                else if (issue.Severity == IssueSeverity.Warning)
+                    attention.Add(issue);
+                else
+                    infos.Add(issue);
+            }
+
+            if (blockers.Count > 0)
+                issueList.Add(MakeTierCard($"Will block the build ({blockers.Count})", errRed,
+                    "No autofix for these - the build stays cancelled until they're fixed by hand.",
+                    null, blockers));
+
+            if (attention.Count > 0)
+                issueList.Add(MakeTierCard($"Needs your attention ({attention.Count})", warnAmber,
+                    "The build proceeds, but these land in the build report as warnings.",
+                    null, attention));
+
+            if (fixable.Count > 0)
+            {
+                var fixAll = new Button(() => AutofixIssues(fixable))
+                {
+                    text = "Fix all",
+                    tooltip = "Run every autofix now"
+                };
+                fixAll.AddToClassList("dd-btn");
+                fixAll.AddToClassList("dd-btn-accent");
+                issueList.Add(MakeTierCard($"Autofixable ({fixable.Count})", okGreen,
+                    "Autofix clears these - during the build with the Autofix checkbox, or right now.",
+                    fixAll, fixable));
+            }
+
+            if (infos.Count > 0)
+                issueList.Add(MakeTierCard($"Info ({infos.Count})", infoBlue, null, null, infos));
+        }
+
+        private VisualElement MakeTierCard(string title, Color accent, string blurb,
+            VisualElement action, List<BuildIssue> tierIssues)
+        {
+            var card = new VisualElement();
+            card.AddToClassList("dd-card");
+
+            var head = new VisualElement();
+            head.AddToClassList("dd-dest-header");
+
+            var titleLabel = new Label(title);
+            titleLabel.AddToClassList("dd-section");
+            titleLabel.AddToClassList("dd-dest-title");
+            titleLabel.style.color = accent;
+            head.Add(titleLabel);
+            if (action != null)
+                head.Add(action);
+            card.Add(head);
+
+            if (!string.IsNullOrEmpty(blurb))
+            {
+                var desc = new Label(blurb);
+                desc.AddToClassList("pf-group-desc");
+                card.Add(desc);
+            }
+
+            foreach (var issue in tierIssues)
+                card.Add(MakeIssueRow(issue, showFileLink: true, showRuleName: true));
+
             return card;
         }
 
@@ -372,10 +501,48 @@ namespace DivineDragon.PreFlightCheck
             message.AddToClassList("pf-issue-msg");
             body.Add(message);
 
+            if (issue.Targets != null && issue.Targets.Count > 0)
+            {
+                var targets = new VisualElement();
+                targets.AddToClassList("pf-issue-targets");
+                foreach (var target in issue.Targets)
+                {
+                    if (target?.Target == null)
+                        continue;
+
+                    var captured = target;
+                    var link = new Button(() => PingTarget(issue, captured))
+                    {
+                        text = captured.Label,
+                        tooltip = string.IsNullOrEmpty(captured.Tooltip) ? $"Select {captured.Label}" : captured.Tooltip
+                    };
+                    link.AddToClassList("pf-link");
+                    targets.Add(link);
+                }
+                body.Add(targets);
+            }
+
             row.Add(body);
 
             var actions = new VisualElement();
             actions.AddToClassList("pf-issue-actions");
+
+            if (issue.Actions != null)
+            {
+                foreach (var action in issue.Actions)
+                {
+                    if (action?.Execute == null)
+                        continue;
+
+                    var captured = action;
+                    actions.Add(MakeGhostButton(captured.Label, captured.Tooltip, () =>
+                    {
+                        if (captured.Execute())
+                            RefreshIssues();
+                    }));
+                }
+            }
+
             if (issue.Rule.CanAutoFix)
                 actions.Add(MakeGhostButton("Autofix", "Fix this issue", () =>
                 {
@@ -531,6 +698,35 @@ namespace DivineDragon.PreFlightCheck
 
             rulesFoldSummary.text = summary;
             rulesFoldSummary.style.display = DisplayStyle.Flex;
+        }
+
+        private void PingTarget(BuildIssue issue, IssueTarget target)
+        {
+            var obj = target.Target;
+
+            if (obj == null)
+            {
+                // References go stale when assets get unloaded (play mode round trips
+                // and the like); a fresh check rebuilds them.
+                Debug.LogWarning($"Preflight: '{target.Label}' is no longer loaded. Hit Refresh and try again.");
+                return;
+            }
+
+            // Components live inside the prefab, so that needs prefab mode; assets
+            // (materials, textures) show their Inspector straight from selection.
+            if (obj is Component && issue.Asset is GameObject)
+            {
+                AssetDatabase.OpenAsset(issue.Asset);
+                EditorApplication.delayCall += () =>
+                {
+                    Selection.activeObject = obj;
+                    EditorGUIUtility.PingObject(obj);
+                };
+                return;
+            }
+
+            Selection.activeObject = obj;
+            EditorGUIUtility.PingObject(obj);
         }
 
         private void OpenIssueAsset(BuildIssue issue)
