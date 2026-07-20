@@ -89,9 +89,12 @@ namespace DivineDragon.PreFlightCheck
         /// <summary>
         /// Validates the given asset and returns any issues found.
         /// Checks run automatically and often (on asset imports, window opens, builds),
-        /// so this must be strictly read-only: never open scenes, save assets, or mutate
-        /// any editor state here. Mutations belong in <see cref="AutoFix"/>, which only
-        /// runs when the user asked for it.
+        /// so this must be strictly read-only: never open scenes, save assets, import,
+        /// or mutate any editor state here. Anything that raises an editor change event
+        /// (an import, a scene touch, an addressables edit) re-triggers the checks, so
+        /// a Validate with side effects puts the editor in an endless check loop.
+        /// Mutations belong in <see cref="AutoFix"/> or an <see cref="IssueAction"/>,
+        /// which only run when the user asked for them.
         /// </summary>
         /// <param name="assetPath">Path to the asset being validated</param>
         /// <param name="asset">The asset object to validate</param>

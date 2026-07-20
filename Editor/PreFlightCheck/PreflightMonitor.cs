@@ -12,15 +12,15 @@ namespace DivineDragon.PreFlightCheck
     /// an actual sweep runs when a watcher window is open, debounced so import bursts
     /// cost one run. With no watcher open the flag just waits - the next window to
     /// open (or the build gate) picks it up.
+    ///
+    /// This relies on rules keeping Validate strictly read-only: a rule that raises
+    /// change events during validation re-triggers the very sweep it runs in and the
+    /// checks loop forever. See the contract on <see cref="BuildRule.Validate"/>.
     /// </summary>
     [InitializeOnLoad]
     public static class PreflightMonitor
     {
         private const double DebounceSeconds = 1.0;
-
-        // Events landing this soon after a run are treated as the run's own footprints
-        // (deferred import callbacks arrive a tick or two late).
-        private const double SelfEventWindowSeconds = 0.5;
 
         /// <summary>Results of the most recent completed run, whoever triggered it.</summary>
         public static List<BuildIssue> LastIssues { get; private set; } = new List<BuildIssue>();
@@ -32,13 +32,6 @@ namespace DivineDragon.PreFlightCheck
         // Dirty until the first run so a freshly opened window always sweeps.
         private static bool dirty = true;
         private static double sweepDueAt = -1;
-
-        // Change events raised while a run is scanning are usually the run's own
-        // footprints (asset loads triggering imports). They mustn't re-arm the timer
-        // directly, or every sweep schedules the next one forever.
-        private static bool dirtiedDuringRun;
-        private static int selfDirtyStreak;
-        private static double lastRunEndedAt = double.NegativeInfinity;
 
         static PreflightMonitor()
         {
@@ -56,27 +49,6 @@ namespace DivineDragon.PreFlightCheck
         internal static void NotifyChanged()
         {
             dirty = true;
-
-            if (PreFlightCheckManager.IsRunning)
-            {
-                // Noted; whether this deserves a follow-up sweep is decided when the
-                // run completes, where self-caused events can be told from real ones.
-                dirtiedDuringRun = true;
-                return;
-            }
-
-            if (EditorApplication.timeSinceStartup - lastRunEndedAt < SelfEventWindowSeconds)
-            {
-                // Probably our own footprints delivered late: allow one follow-up in
-                // case it was a real edit, but a streak means self-triggering - stop
-                // and let the dirty flag wait for a real event or window open.
-                selfDirtyStreak++;
-                if (selfDirtyStreak < 2 && AnyWatcherOpen())
-                    sweepDueAt = EditorApplication.timeSinceStartup + DebounceSeconds;
-                return;
-            }
-
-            selfDirtyStreak = 0;
 
             // (Re)arm the debounce timer only when the results are actually on screen.
             if (AnyWatcherOpen())
@@ -120,24 +92,7 @@ namespace DivineDragon.PreFlightCheck
         {
             LastIssues = issues;
             LastCheckTime = DateTime.Now;
-            lastRunEndedAt = EditorApplication.timeSinceStartup;
-
-            if (dirtiedDuringRun)
-            {
-                dirtiedDuringRun = false;
-                selfDirtyStreak++;
-
-                // Once could be a real edit that landed mid-sweep - follow up. A streak
-                // means the run is triggering itself; stay dirty and wait for a real
-                // event (or the next window open) instead of looping.
-                if (selfDirtyStreak < 2 && AnyWatcherOpen())
-                    sweepDueAt = EditorApplication.timeSinceStartup + DebounceSeconds;
-                return;
-            }
-
-            selfDirtyStreak = 0;
             dirty = false;
-            sweepDueAt = -1; // this run satisfies any sweep still pending
         }
 
         private static bool AnyWatcherOpen()

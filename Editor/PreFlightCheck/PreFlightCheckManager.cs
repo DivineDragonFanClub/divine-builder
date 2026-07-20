@@ -25,13 +25,6 @@ namespace DivineDragon.PreFlightCheck
         /// </summary>
         public static event Action<List<BuildIssue>> ChecksCompleted;
 
-        /// <summary>
-        /// True while a run is scanning. Loading assets during the scan can itself raise
-        /// import/modification events; the monitor uses this to tell those apart from
-        /// real edits, otherwise every sweep would schedule the next one forever.
-        /// </summary>
-        public static bool IsRunning { get; private set; }
-
         // Markers for rules that validate something project-wide instead of a single addressable.
         private static readonly string[] SpecialCheckMarkers = { "SCENE_CHECK", "ADDRESSABLE_PATH_CHECK" };
 
@@ -70,65 +63,57 @@ namespace DivineDragon.PreFlightCheck
             var allIssues = new List<BuildIssue>();
             int assetsChecked = 0;
 
-            IsRunning = true;
-            try
+            // Run the per-asset rules against every addressable entry.
+            foreach (var group in settings.groups)
             {
-                // Run the per-asset rules against every addressable entry.
-                foreach (var group in settings.groups)
+                if (group == null) continue;
+
+                foreach (var entry in group.entries)
                 {
-                    if (group == null) continue;
+                    if (entry == null) continue;
 
-                    foreach (var entry in group.entries)
+                    string assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
+                    if (string.IsNullOrEmpty(assetPath)) continue;
+
+                    Object asset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
+                    if (asset == null) continue;
+
+                    assetsChecked++;
+
+                    foreach (var rule in activeRules)
                     {
-                        if (entry == null) continue;
-
-                        string assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
-                        if (string.IsNullOrEmpty(assetPath)) continue;
-
-                        Object asset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
-                        if (asset == null) continue;
-
-                        assetsChecked++;
-
-                        foreach (var rule in activeRules)
-                        {
-                            if (!rule.AppliesTo(assetPath, asset))
-                                continue;
-
-                            try
-                            {
-                                allIssues.AddRange(rule.Validate(assetPath, asset));
-                            }
-                            catch (Exception ex)
-                            {
-                                Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception while validating '{assetPath}': {ex}");
-                            }
-                        }
-                    }
-                }
-
-                // Run the project-wide rules once each.
-                foreach (var rule in activeRules)
-                {
-                    foreach (var marker in SpecialCheckMarkers)
-                    {
-                        if (!rule.AppliesTo(marker, null))
+                        if (!rule.AppliesTo(assetPath, asset))
                             continue;
 
                         try
                         {
-                            allIssues.AddRange(rule.Validate(marker, null));
+                            allIssues.AddRange(rule.Validate(assetPath, asset));
                         }
                         catch (Exception ex)
                         {
-                            Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception during {marker}: {ex}");
+                            Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception while validating '{assetPath}': {ex}");
                         }
                     }
                 }
             }
-            finally
+
+            // Run the project-wide rules once each.
+            foreach (var rule in activeRules)
             {
-                IsRunning = false;
+                foreach (var marker in SpecialCheckMarkers)
+                {
+                    if (!rule.AppliesTo(marker, null))
+                        continue;
+
+                    try
+                    {
+                        allIssues.AddRange(rule.Validate(marker, null));
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception during {marker}: {ex}");
+                    }
+                }
             }
 
             LastRunSeconds = stopwatch.Elapsed.TotalSeconds;
