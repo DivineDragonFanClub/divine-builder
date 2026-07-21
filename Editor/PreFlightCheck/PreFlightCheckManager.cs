@@ -4,8 +4,15 @@ using System.Linq;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.AddressableAssets;
+using UnityEditor.SceneManagement;
+using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
 using Stopwatch = System.Diagnostics.Stopwatch;
+#if UNITY_2021_2_OR_NEWER
+using PrefabStageUtility = UnityEditor.SceneManagement.PrefabStageUtility;
+#else
+using PrefabStageUtility = UnityEditor.Experimental.SceneManagement.PrefabStageUtility;
+#endif
 
 namespace DivineDragon.PreFlightCheck
 {
@@ -128,6 +135,66 @@ namespace DivineDragon.PreFlightCheck
         public static string FormatDuration(double seconds)
         {
             return seconds >= 1 ? $"{seconds:0.0} s" : $"{seconds * 1000:0} ms";
+        }
+
+        /// <summary>
+        /// Whether there are unsaved edits that saving would actually reveal to the checks:
+        /// a dirty prefab open in prefab mode (checks read the saved asset, not the stage),
+        /// or a dirty open scene. Material and other asset edits are read live, so they don't
+        /// count here - a plain re-check already sees them.
+        /// </summary>
+        public static bool HasSavableEdits()
+        {
+            if (EditorApplication.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode)
+                return false;
+
+            var stage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (stage != null && stage.scene.isDirty)
+                return true;
+
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+            {
+                if (SceneManager.GetSceneAt(i).isDirty)
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Flushes unsaved editor state to disk so the checks see it: the prefab open in
+        /// prefab mode, open scenes, and dirty assets. Checks read saved asset state, so
+        /// prefab-mode edits are otherwise invisible until saved. No-op in play mode.
+        /// Returns true if anything was written.
+        /// </summary>
+        public static bool SavePendingEdits()
+        {
+            if (EditorApplication.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode)
+                return false;
+
+            bool savedAnything = false;
+
+            // A prefab being edited in prefab mode isn't written to its asset until saved,
+            // and SaveAssets/SaveOpenScenes don't touch it - persist it explicitly.
+            try
+            {
+                var stage = PrefabStageUtility.GetCurrentPrefabStage();
+                if (stage != null && stage.scene.isDirty)
+                {
+                    PrefabUtility.SaveAsPrefabAsset(stage.prefabContentsRoot, stage.assetPath);
+                    savedAnything = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"Divine Builder: couldn't save the open prefab before checking: {ex.Message}");
+            }
+
+            if (EditorSceneManager.SaveOpenScenes())
+                savedAnything = true;
+
+            AssetDatabase.SaveAssets();
+            return savedAnything;
         }
 
         // The three build-time behaviors, counted for badges and summaries: blocking issues

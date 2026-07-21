@@ -84,6 +84,7 @@
                 <ui:Label text="See issues" display-tooltip-when-elided="true" name="preflightSeeIssues" tooltip="Open the Preflight Check window" style="display: none; margin-left: 8px; margin-right: 0; margin-top: 0; margin-bottom: 0; color: rgb(100, 149, 237);" />
             </ui:VisualElement>
             <ui:Toggle label="Run autofix for issues on build" name="autofixCheckbox" tooltip="Automatically fix fixable issues before building. Fatal issues that remain still block the build; warnings don't." style="margin-top: 2px;" />
+            <ui:Button text="Save &amp; check" display-tooltip-when-elided="true" name="SaveCheckButton" tooltip="Save the open prefab, scenes, and assets, then run the checks against the saved state" class="dd-btn dd-btn-ghost" style="align-self: flex-start; margin-left: 0; margin-top: 6px; display: none;" />
         </ui:VisualElement>
 
         <ui:VisualElement name="buildContainer" class="dd-card">

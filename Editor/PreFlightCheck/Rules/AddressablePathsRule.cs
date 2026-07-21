@@ -20,7 +20,6 @@ namespace DivineDragon.PreFlightCheck.Rules
         }
 
         private Config config;
-        private bool configExpanded = false;
 
         public override string Name => "Addressable Path Validation";
 

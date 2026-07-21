@@ -14,6 +14,7 @@
                 <ui:Button text="By rule" display-tooltip-when-elided="true" name="TabByRule" tooltip="Group issues by the rule that found them" class="dd-tab" />
                 <ui:Button text="By asset" display-tooltip-when-elided="true" name="TabByAsset" tooltip="Group issues by the asset they were found on" class="dd-tab" />
             </ui:VisualElement>
+            <ui:Button text="Save &amp; check" display-tooltip-when-elided="true" name="SaveCheckButton" tooltip="Save the open prefab, scenes, and assets, then run the checks against the saved state" class="dd-btn dd-btn-ghost" style="display: none;" />
             <ui:Button text="Refresh" display-tooltip-when-elided="true" name="RefreshButton" tooltip="Run the checks again" class="dd-btn dd-btn-ghost" />
         </ui:VisualElement>
 

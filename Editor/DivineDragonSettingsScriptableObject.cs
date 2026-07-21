@@ -242,6 +242,7 @@ namespace DivineDragon
         private Label buildStatusLabel;
         private Label preflightBadge;
         private Label preflightSeeIssues;
+        private Button preflightSaveCheck;
         // True while buildStatusLabel shows a build outcome; live preflight updates must
         // not overwrite that with a fresh readiness verdict.
         private bool showingBuildOutcome;
@@ -274,6 +275,7 @@ namespace DivineDragon
         private Color okGreen = new Color(0.30f, 0.78f, 0.33f, 1.0f);
         private Color warnAmber = new Color(0.92f, 0.66f, 0.18f, 1.0f);
         private Color errRed = new Color(0.86f, 0.33f, 0.33f, 1.0f);
+        private Color infoBlue = new Color(0.39f, 0.58f, 0.93f, 1.0f);
 
         [MenuItem("Divine Dragon/Divine Dragon Window #%d", false, 1501)]
         public static void ShowSettings()
@@ -1681,7 +1683,22 @@ namespace DivineDragon
 
             preflightBadge.AddManipulator(new Clickable(PreflightCheckWindow.ShowWindow));
             preflightSeeIssues?.AddManipulator(new Clickable(PreflightCheckWindow.ShowWindow));
+
+            preflightSaveCheck = divineWindow.Q<Button>("SaveCheckButton");
+            if (preflightSaveCheck != null)
+                preflightSaveCheck.clickable.clicked += () =>
+                {
+                    PreFlightCheckManager.SavePendingEdits();
+                    RefreshSaveCheckButton();
+                    PreFlightCheckManager.RunAllChecks(); // results refresh the badge via ChecksCompleted
+                };
+
+            // Prefab-stage dirtiness has no event, so poll to show the button only when
+            // saving would actually change what the checks see.
+            preflightBadge.schedule.Execute(RefreshSaveCheckButton).Every(1000);
+
             UpdatePreflightBadge();
+            RefreshSaveCheckButton();
         }
 
         private void OnPreflightChecksCompleted(List<BuildIssue> issues)
@@ -1732,6 +1749,26 @@ namespace DivineDragon
             return PreflightBlockingCount() > 0;
         }
 
+        // Show the Save & check button only when saving would change what the checks see
+        // (a dirty prefab stage or scene). Otherwise a plain re-check already suffices.
+        private void RefreshSaveCheckButton()
+        {
+            if (preflightSaveCheck != null)
+                preflightSaveCheck.style.display =
+                    PreFlightCheckManager.HasSavableEdits() ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        // Red when something's fatal, amber when there's action to take (attention or
+        // autofixable), calm blue when it's info-only. Assumes there's at least one issue.
+        private Color PreflightSummaryColor(PreFlightCheckManager.TierCounts tiers, bool autofixOn)
+        {
+            if (PreFlightCheckManager.WillBlockCount(tiers, autofixOn) > 0)
+                return errRed;
+            if (tiers.Attention > 0 || tiers.Fixable > 0)
+                return warnAmber;
+            return infoBlue;
+        }
+
         private void UpdatePreflightBadge()
         {
             if (preflightBadge == null)
@@ -1759,8 +1796,7 @@ namespace DivineDragon
             bool autofixOn = DivineDragonSettingsScriptableObject.instance.getPreBuildAutofix();
             var tiers = PreFlightCheckManager.CountTiers(issues);
             preflightBadge.text = PreFlightCheckManager.SummarizeTiers(tiers, autofixOn);
-            preflightBadge.style.color =
-                PreFlightCheckManager.WillBlockCount(tiers, autofixOn) > 0 ? errRed : warnAmber;
+            preflightBadge.style.color = PreflightSummaryColor(tiers, autofixOn);
             if (preflightSeeIssues != null)
                 preflightSeeIssues.style.display = DisplayStyle.Flex;
         }

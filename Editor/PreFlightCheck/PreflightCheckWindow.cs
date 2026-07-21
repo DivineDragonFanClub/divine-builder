@@ -26,6 +26,7 @@ namespace DivineDragon.PreFlightCheck
         private Button tabByStatus;
         private Button tabByRule;
         private Button tabByAsset;
+        private Button saveCheckButton;
         private Button refreshButton;
         private VisualElement rulesHeader;
         private ScrollView rulesScroll;
@@ -109,6 +110,7 @@ namespace DivineDragon.PreFlightCheck
             tabByStatus = content.Q<Button>("TabByStatus");
             tabByRule = content.Q<Button>("TabByRule");
             tabByAsset = content.Q<Button>("TabByAsset");
+            saveCheckButton = content.Q<Button>("SaveCheckButton");
             refreshButton = content.Q<Button>("RefreshButton");
             rulesHeader = content.Q<VisualElement>("rulesHeader");
             rulesScroll = content.Q<ScrollView>("rulesScroll");
@@ -126,6 +128,7 @@ namespace DivineDragon.PreFlightCheck
             tabByStatus.clickable.clicked += () => SelectView(ViewMode.ByStatus);
             tabByRule.clickable.clicked += () => SelectView(ViewMode.ByRule);
             tabByAsset.clickable.clicked += () => SelectView(ViewMode.ByAsset);
+            saveCheckButton.clickable.clicked += SaveAndCheck;
             refreshButton.clickable.clicked += RefreshIssues;
 
             ApplyRulesCollapsed(EditorPrefs.GetBool(RulesCollapsedPref, true));
@@ -136,8 +139,13 @@ namespace DivineDragon.PreFlightCheck
                 ApplyRulesCollapsed(collapsed);
             });
 
-            // Keep the "last checked" relative time reading true while the window sits open.
-            rootVisualElement.schedule.Execute(UpdateStatus).Every(1000);
+            // Keep the relative time and the Save & check button (shown only when there's
+            // something to save) current while the window sits open.
+            rootVisualElement.schedule.Execute(() =>
+            {
+                UpdateStatus();
+                RefreshSaveCheckButton();
+            }).Every(1000);
 
             // Adopt what the monitor already knows, then let it re-sweep if anything is stale.
             if (lastCheckTime == DateTime.MinValue && PreflightMonitor.HasRun)
@@ -148,6 +156,7 @@ namespace DivineDragon.PreFlightCheck
 
             RebuildRulesPanel();
             RefreshView();
+            RefreshSaveCheckButton();
             PreflightMonitor.EnsureFresh();
         }
 
@@ -155,6 +164,21 @@ namespace DivineDragon.PreFlightCheck
         {
             currentViewMode = mode;
             RefreshView();
+        }
+
+        private void SaveAndCheck()
+        {
+            PreFlightCheckManager.SavePendingEdits();
+            RefreshSaveCheckButton();
+            RefreshIssues();
+        }
+
+        // The button only earns its place when saving would change what the checks see.
+        private void RefreshSaveCheckButton()
+        {
+            if (saveCheckButton != null)
+                saveCheckButton.style.display =
+                    PreFlightCheckManager.HasSavableEdits() ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         private void RefreshIssues()
@@ -248,7 +272,13 @@ namespace DivineDragon.PreFlightCheck
                 var tiers = PreFlightCheckManager.CountTiers(issues);
                 statusLabel.text = $"{PreFlightCheckManager.SummarizeTiers(tiers, autofixOn)} · checked " +
                                    TimeFormatter.GetRelativeTimeWithTimestamp(lastCheckTime) + RunCostSuffix();
-                statusLabel.style.color = PreFlightCheckManager.WillBlockCount(tiers, autofixOn) > 0 ? errRed : warnAmber;
+
+                if (PreFlightCheckManager.WillBlockCount(tiers, autofixOn) > 0)
+                    statusLabel.style.color = errRed;
+                else if (tiers.Attention > 0 || tiers.Fixable > 0)
+                    statusLabel.style.color = warnAmber;
+                else
+                    statusLabel.style.color = infoBlue;
             }
         }
 
@@ -351,7 +381,9 @@ namespace DivineDragon.PreFlightCheck
             }
 
             if (infos.Count > 0)
-                issueList.Add(MakeTierCard($"Info ({infos.Count})", infoBlue, null, null, infos));
+                issueList.Add(MakeTierCard($"Info ({infos.Count})", infoBlue,
+                    "Not blocking and not autofixable - things to handle when you're ready. The build ignores these.",
+                    null, infos));
         }
 
         private VisualElement MakeTierCard(string title, Color accent, string blurb,
