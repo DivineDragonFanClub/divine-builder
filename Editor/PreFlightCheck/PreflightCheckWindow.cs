@@ -273,7 +273,7 @@ namespace DivineDragon.PreFlightCheck
                 statusLabel.text = $"{PreFlightCheckManager.SummarizeTiers(tiers, autofixOn)} · checked " +
                                    TimeFormatter.GetRelativeTimeWithTimestamp(lastCheckTime) + RunCostSuffix();
 
-                if (PreFlightCheckManager.WillBlockCount(tiers, autofixOn) > 0)
+                if (PreFlightCheckManager.WillBlockCount(tiers) > 0)
                     statusLabel.style.color = errRed;
                 else if (tiers.Attention > 0 || tiers.Fixable > 0)
                     statusLabel.style.color = warnAmber;
@@ -502,10 +502,10 @@ namespace DivineDragon.PreFlightCheck
 
             var icon = new Label("●")
             {
-                tooltip = issue.Severity.ToString()
+                tooltip = IssueTierLabel(issue)
             };
             icon.AddToClassList("pf-issue-icon");
-            icon.style.color = SeverityColor(issue.Severity);
+            icon.style.color = IssueTierColor(issue);
             row.Add(icon);
 
             var body = new VisualElement();
@@ -602,17 +602,30 @@ namespace DivineDragon.PreFlightCheck
             return button;
         }
 
-        private static Color SeverityColor(IssueSeverity severity)
+        // The dot follows the tier the issue lands in (what happens to the build), not its
+        // raw severity - otherwise an autofixable error shows a red dot inside the green
+        // Autofixable section, which reads as a contradiction. CanAutoFix wins first, same
+        // as the grouping in BuildByStatusView.
+        private static Color IssueTierColor(BuildIssue issue)
         {
-            switch (severity)
-            {
-                case IssueSeverity.Error:
-                    return errRed;
-                case IssueSeverity.Warning:
-                    return warnAmber;
-                default:
-                    return infoBlue;
-            }
+            if (issue.Rule.CanAutoFix)
+                return okGreen;
+            if (issue.Severity == IssueSeverity.Error)
+                return errRed;
+            if (issue.Severity == IssueSeverity.Warning)
+                return warnAmber;
+            return infoBlue;
+        }
+
+        private static string IssueTierLabel(BuildIssue issue)
+        {
+            if (issue.Rule.CanAutoFix)
+                return "Autofixable";
+            if (issue.Severity == IssueSeverity.Error)
+                return "Fatal - blocks the build";
+            if (issue.Severity == IssueSeverity.Warning)
+                return "Needs attention";
+            return "Info";
         }
 
         private void ApplyRulesCollapsed(bool collapsed)

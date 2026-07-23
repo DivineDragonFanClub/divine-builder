@@ -83,9 +83,10 @@ namespace DivineDragon
                 }
             }
 
-            // Validate addressables before the expensive build. With Autofix on, fixable issues
-            // are repaired first. Of whatever remains, only error-severity issues block the
-            // build; warnings ride along on the outcome so the report shows them.
+            // Validate addressables before the expensive build. With Autofix on, fixable
+            // issues are repaired first. Of whatever remains, only fatal issues (errors with
+            // no autofix) block the build. Everything else that isn't Info rides along on the
+            // outcome as a note - including fixable issues left unfixed when Autofix is off.
             if (settings.getPreBuildAutofix())
             {
                 var initialIssues = PreFlightCheck.PreFlightCheckManager.RunAllChecks();
@@ -97,31 +98,33 @@ namespace DivineDragon
             }
 
             var preflightIssues = PreFlightCheck.PreFlightCheckManager.RunAllChecks();
-            var preflightErrors = preflightIssues
-                .Where(i => i.Severity == PreFlightCheck.IssueSeverity.Error).ToList();
-            foreach (var issue in preflightIssues.Where(i => i.Severity == PreFlightCheck.IssueSeverity.Warning))
+            var fatalIssues = preflightIssues
+                .Where(i => i.Severity == PreFlightCheck.IssueSeverity.Error && !i.Rule.CanAutoFix).ToList();
+            foreach (var issue in preflightIssues)
             {
+                // Info is window-only; fatal issues are reported as errors below.
+                if (issue.Severity == PreFlightCheck.IssueSeverity.Info) continue;
+                if (issue.Severity == PreFlightCheck.IssueSeverity.Error && !issue.Rule.CanAutoFix) continue;
+
                 string warning = $"Pre-flight: {issue.AssetPath}: {issue.Message}";
                 outcome.Warnings.Add(warning);
                 Debug.LogWarning($"Divine Builder: {warning}");
             }
 
-            if (preflightErrors.Count > 0)
+            if (fatalIssues.Count > 0)
             {
                 PreFlightCheck.PreflightCheckWindow.ShowWithIssues(preflightIssues);
-                Debug.LogError($"Divine Builder: build cancelled, {preflightErrors.Count} pre-flight error(s) found. " +
+                Debug.LogError($"Divine Builder: build cancelled, {fatalIssues.Count} fatal pre-flight issue(s) found. " +
                                "See the Preflight Check window.");
                 outcome.FailureStage = "pre-flight checks";
-                foreach (var issue in preflightErrors)
+                foreach (var issue in fatalIssues)
                 {
                     outcome.Errors.Add(new BuildError
                     {
                         BundlePath = issue.AssetPath,
                         Kind = BuildErrorKind.PreFlight,
                         Detail = issue.Message,
-                        Hint = issue.Rule.CanAutoFix
-                            ? "Fix it in the Preflight Check window, or enable Autofix."
-                            : "Fix it in the Preflight Check window."
+                        Hint = "Fix it in the Preflight Check window."
                     });
                 }
                 outcome.ElapsedSeconds = sw.Elapsed.TotalSeconds;

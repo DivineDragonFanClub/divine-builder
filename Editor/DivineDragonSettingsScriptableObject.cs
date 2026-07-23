@@ -413,11 +413,9 @@ namespace DivineDragon
             autofixToggle.RegisterValueChangedCallback(evt =>
             {
                 DivineDragonSettingsScriptableObject.instance.setPreBuildAutofix(evt.newValue);
-                // Fixable errors flip between fatal and "will be autofixed" with this
-                // checkbox, so both status lines change meaning.
+                // Autofix no longer changes what blocks the build, but it does change how
+                // fixable issues read ("will be autofixed" vs "can be autofixed").
                 UpdatePreflightBadge();
-                if (!showingBuildOutcome)
-                    UpdateBuildStatus();
             });
         }
 
@@ -1733,15 +1731,14 @@ namespace DivineDragon
         }
 
         // How many fatal issues the build can't proceed past right now, as far as the last
-        // check knows. Fixable errors count only while Autofix is off to repair them.
+        // check knows. Only non-autofixable errors are fatal, so this is Autofix-independent.
         private static int PreflightBlockingCount()
         {
             if (!PreflightMonitor.HasRun)
                 return 0;
 
             var tiers = PreFlightCheckManager.CountTiers(PreflightMonitor.LastIssues);
-            bool autofixOn = DivineDragonSettingsScriptableObject.instance.getPreBuildAutofix();
-            return PreFlightCheckManager.WillBlockCount(tiers, autofixOn);
+            return PreFlightCheckManager.WillBlockCount(tiers);
         }
 
         private static bool PreflightWillBlock()
@@ -1760,9 +1757,9 @@ namespace DivineDragon
 
         // Red when something's fatal, amber when there's action to take (attention or
         // autofixable), calm blue when it's info-only. Assumes there's at least one issue.
-        private Color PreflightSummaryColor(PreFlightCheckManager.TierCounts tiers, bool autofixOn)
+        private Color PreflightSummaryColor(PreFlightCheckManager.TierCounts tiers)
         {
-            if (PreFlightCheckManager.WillBlockCount(tiers, autofixOn) > 0)
+            if (PreFlightCheckManager.WillBlockCount(tiers) > 0)
                 return errRed;
             if (tiers.Attention > 0 || tiers.Fixable > 0)
                 return warnAmber;
@@ -1796,7 +1793,7 @@ namespace DivineDragon
             bool autofixOn = DivineDragonSettingsScriptableObject.instance.getPreBuildAutofix();
             var tiers = PreFlightCheckManager.CountTiers(issues);
             preflightBadge.text = PreFlightCheckManager.SummarizeTiers(tiers, autofixOn);
-            preflightBadge.style.color = PreflightSummaryColor(tiers, autofixOn);
+            preflightBadge.style.color = PreflightSummaryColor(tiers);
             if (preflightSeeIssues != null)
                 preflightSeeIssues.style.display = DisplayStyle.Flex;
         }

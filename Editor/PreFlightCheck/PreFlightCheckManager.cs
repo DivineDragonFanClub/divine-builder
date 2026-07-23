@@ -202,10 +202,9 @@ namespace DivineDragon.PreFlightCheck
         // cleared by Autofix. Info is none of those.
         public struct TierCounts
         {
-            public int Blocking;      // error severity, no autofix
-            public int Attention;     // warning severity, no autofix
-            public int Fixable;       // anything the rule can autofix
-            public int FixableErrors; // the subset of Fixable that blocks when Autofix is off
+            public int Blocking;   // error severity, no autofix - the only "fatal" tier
+            public int Attention;  // warning severity, no autofix
+            public int Fixable;    // anything the rule can autofix
             public int Info;
         }
 
@@ -215,11 +214,7 @@ namespace DivineDragon.PreFlightCheck
             foreach (var issue in issues)
             {
                 if (issue.Rule.CanAutoFix)
-                {
                     counts.Fixable++;
-                    if (issue.Severity == IssueSeverity.Error)
-                        counts.FixableErrors++;
-                }
                 else if (issue.Severity == IssueSeverity.Error)
                     counts.Blocking++;
                 else if (issue.Severity == IssueSeverity.Warning)
@@ -231,29 +226,21 @@ namespace DivineDragon.PreFlightCheck
         }
 
         /// <summary>
-        /// How many issues the build gate would refuse over, given the Autofix setting:
-        /// fixable errors stop being blockers when Autofix will repair them first.
+        /// How many issues genuinely block the build: non-autofixable errors, the only
+        /// "fatal" tier. Autofixable issues never block - Autofix repairs them, or with
+        /// Autofix off they just ride along as notes - so they're never counted here.
         /// </summary>
-        public static int WillBlockCount(TierCounts counts, bool autofixEnabled)
+        public static int WillBlockCount(TierCounts counts)
         {
-            return counts.Blocking + (autofixEnabled ? 0 : counts.FixableErrors);
+            return counts.Blocking;
         }
 
         public static string SummarizeTiers(TierCounts counts, bool autofixEnabled)
         {
-            int willBlock = WillBlockCount(counts, autofixEnabled);
             var parts = new List<string>();
 
-            if (willBlock > 0)
-            {
-                parts.Add($"{willBlock} fatal issue{(willBlock == 1 ? "" : "s")}");
-                if (!autofixEnabled && counts.FixableErrors > 0)
-                {
-                    parts.Add(counts.FixableErrors == willBlock
-                        ? "enable Autofix to fix them"
-                        : $"enable Autofix to fix {counts.FixableErrors} of them");
-                }
-            }
+            if (counts.Blocking > 0)
+                parts.Add($"{counts.Blocking} fatal issue{(counts.Blocking == 1 ? "" : "s")}");
 
             if (counts.Attention > 0)
             {
@@ -261,17 +248,11 @@ namespace DivineDragon.PreFlightCheck
                           $"need{(counts.Attention == 1 ? "s" : "")} attention");
             }
 
-            if (autofixEnabled)
+            if (counts.Fixable > 0)
             {
-                if (counts.Fixable > 0)
-                    parts.Add($"{counts.Fixable} issue{(counts.Fixable == 1 ? "" : "s")} will be autofixed on build");
-            }
-            else
-            {
-                // Fixable errors were already covered by the "enable Autofix" hint above.
-                int fixableWarnings = counts.Fixable - counts.FixableErrors;
-                if (fixableWarnings > 0)
-                    parts.Add($"{fixableWarnings} issue{(fixableWarnings == 1 ? "" : "s")} can be autofixed");
+                parts.Add(autofixEnabled
+                    ? $"{counts.Fixable} issue{(counts.Fixable == 1 ? "" : "s")} will be autofixed on build"
+                    : $"{counts.Fixable} issue{(counts.Fixable == 1 ? "" : "s")} can be autofixed");
             }
 
             if (counts.Info > 0)
