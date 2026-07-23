@@ -124,7 +124,7 @@ namespace DivineDragon.PreFlightCheck
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError($"Failed to instantiate pre-flight rule: {ex}");
+                        Debug.LogError($"Failed to instantiate validation rule: {ex}");
                     }
                 }
 
@@ -224,7 +224,7 @@ namespace DivineDragon.PreFlightCheck
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Failed to resolve pre-flight rule type: {ex}");
+                Debug.LogError($"Failed to resolve validation rule type: {ex}");
             }
 
             return entry.RuleType;
@@ -257,7 +257,7 @@ namespace DivineDragon.PreFlightCheck
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Failed to evaluate metadata for pre-flight rule: {ex}");
+                Debug.LogError($"Failed to evaluate metadata for validation rule: {ex}");
             }
             finally
             {

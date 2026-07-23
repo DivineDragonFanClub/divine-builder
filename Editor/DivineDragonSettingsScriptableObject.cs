@@ -240,8 +240,8 @@ namespace DivineDragon
         private TextField sdPathField;
         private TextField modPathField;
         private Label buildStatusLabel;
-        private Label preflightBadge;
-        private Label preflightSeeIssues;
+        private VisualElement preflightRows;
+        private Button preflightSeeIssues;
         private Button preflightSaveCheck;
         // True while buildStatusLabel shows a build outcome; live preflight updates must
         // not overwrite that with a fresh readiness verdict.
@@ -1674,13 +1674,11 @@ namespace DivineDragon
 
         private void InitializePreflightBadge(VisualElement divineWindow)
         {
-            preflightBadge = divineWindow.Q<Label>("preflightBadge");
-            preflightSeeIssues = divineWindow.Q<Label>("preflightSeeIssues");
-            if (preflightBadge == null)
-                return;
+            preflightRows = divineWindow.Q<VisualElement>("preflightRows");
 
-            preflightBadge.AddManipulator(new Clickable(PreflightCheckWindow.ShowWindow));
-            preflightSeeIssues?.AddManipulator(new Clickable(PreflightCheckWindow.ShowWindow));
+            preflightSeeIssues = divineWindow.Q<Button>("SeeIssuesButton");
+            if (preflightSeeIssues != null)
+                preflightSeeIssues.clickable.clicked += PreflightCheckWindow.ShowWindow;
 
             preflightSaveCheck = divineWindow.Q<Button>("SaveCheckButton");
             if (preflightSaveCheck != null)
@@ -1688,12 +1686,13 @@ namespace DivineDragon
                 {
                     PreFlightCheckManager.SavePendingEdits();
                     RefreshSaveCheckButton();
-                    PreFlightCheckManager.RunAllChecks(); // results refresh the badge via ChecksCompleted
+                    PreFlightCheckManager.RunAllChecks(); // results refresh the rows via ChecksCompleted
                 };
 
             // Prefab-stage dirtiness has no event, so poll to show the button only when
             // saving would actually change what the checks see.
-            preflightBadge.schedule.Execute(RefreshSaveCheckButton).Every(1000);
+            if (preflightRows != null)
+                preflightRows.schedule.Execute(RefreshSaveCheckButton).Every(1000);
 
             UpdatePreflightBadge();
             RefreshSaveCheckButton();
@@ -1730,8 +1729,8 @@ namespace DivineDragon
                 buildButton.SetEnabled(ConfigAllowsBuild() && !PreflightWillBlock());
         }
 
-        // How many fatal issues the build can't proceed past right now, as far as the last
-        // check knows. Only non-autofixable errors are fatal, so this is Autofix-independent.
+        // How many errors block the build right now, as far as the last check knows. Only
+        // non-autofixable errors block, so this is Autofix-independent.
         private static int PreflightBlockingCount()
         {
             if (!PreflightMonitor.HasRun)
@@ -1755,47 +1754,73 @@ namespace DivineDragon
                     PreFlightCheckManager.HasSavableEdits() ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
-        // Red when something's fatal, amber when there's action to take (attention or
-        // autofixable), calm blue when it's info-only. Assumes there's at least one issue.
-        private Color PreflightSummaryColor(PreFlightCheckManager.TierCounts tiers)
-        {
-            if (PreFlightCheckManager.WillBlockCount(tiers) > 0)
-                return errRed;
-            if (tiers.Attention > 0 || tiers.Fixable > 0)
-                return warnAmber;
-            return infoBlue;
-        }
-
+        // One row per non-empty tier: a coloured dot plus plain-coloured text, so the
+        // colour signals severity without making the words hard to read. The See issues
+        // button below opens the full window.
         private void UpdatePreflightBadge()
         {
-            if (preflightBadge == null)
+            if (preflightRows == null)
                 return;
+
+            preflightRows.Clear();
+            bool hasIssues = PreflightMonitor.HasRun && PreflightMonitor.LastIssues.Count > 0;
+            if (preflightSeeIssues != null)
+                preflightSeeIssues.style.display = hasIssues ? DisplayStyle.Flex : DisplayStyle.None;
 
             if (!PreflightMonitor.HasRun)
             {
-                preflightBadge.text = "Checking for issues…";
-                preflightBadge.style.color = new StyleColor(StyleKeyword.Null);
-                if (preflightSeeIssues != null)
-                    preflightSeeIssues.style.display = DisplayStyle.None;
+                preflightRows.Add(MakePreflightRow(null, "Checking for issues…"));
                 return;
             }
 
-            var issues = PreflightMonitor.LastIssues;
-            if (issues.Count == 0)
+            if (!hasIssues)
             {
-                preflightBadge.text = "No issues found.";
-                preflightBadge.style.color = okGreen;
-                if (preflightSeeIssues != null)
-                    preflightSeeIssues.style.display = DisplayStyle.None;
+                preflightRows.Add(MakePreflightRow(okGreen, "No issues found."));
                 return;
             }
 
             bool autofixOn = DivineDragonSettingsScriptableObject.instance.getPreBuildAutofix();
-            var tiers = PreFlightCheckManager.CountTiers(issues);
-            preflightBadge.text = PreFlightCheckManager.SummarizeTiers(tiers, autofixOn);
-            preflightBadge.style.color = PreflightSummaryColor(tiers);
-            if (preflightSeeIssues != null)
-                preflightSeeIssues.style.display = DisplayStyle.Flex;
+            var tiers = PreFlightCheckManager.CountTiers(PreflightMonitor.LastIssues);
+
+            if (tiers.Blocking > 0)
+                preflightRows.Add(MakePreflightRow(errRed, NeedsAttention(tiers.Blocking, "error")));
+
+            if (tiers.Attention > 0)
+                preflightRows.Add(MakePreflightRow(warnAmber, NeedsAttention(tiers.Attention, "major issue")));
+
+            if (tiers.Fixable > 0)
+                preflightRows.Add(MakePreflightRow(okGreen, autofixOn
+                    ? $"{tiers.Fixable} issue{(tiers.Fixable == 1 ? "" : "s")} will be autofixed on build"
+                    : $"{tiers.Fixable} issue{(tiers.Fixable == 1 ? "" : "s")} can be autofixed"));
+
+            if (tiers.Info > 0)
+                preflightRows.Add(MakePreflightRow(infoBlue, NeedsAttention(tiers.Info, "minor issue")));
+        }
+
+        private static string NeedsAttention(int count, string noun)
+        {
+            return $"{count} {noun}{(count == 1 ? "" : "s")} {(count == 1 ? "needs" : "need")} your attention";
+        }
+
+        private VisualElement MakePreflightRow(Color? dotColor, string text)
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.marginBottom = 1;
+
+            var dot = new Label("●");
+            dot.style.marginRight = 6;
+            dot.style.unityTextAlign = TextAnchor.MiddleCenter;
+            // Transparent (but space-holding) dot for the transient "Checking…" line.
+            dot.style.color = dotColor ?? new Color(0f, 0f, 0f, 0f);
+            row.Add(dot);
+
+            var label = new Label(text);
+            label.style.whiteSpace = WhiteSpace.Normal;
+            row.Add(label);
+
+            return row;
         }
 
         private void UpdateBuildStatus()
@@ -1827,7 +1852,7 @@ namespace DivineDragon
                 else if (PreflightWillBlock())
                 {
                     int blocking = PreflightBlockingCount();
-                    buildStatusLabel.text = $"Can't build - {blocking} fatal issue{(blocking == 1 ? "" : "s")} above.";
+                    buildStatusLabel.text = $"Can't build - {blocking} error{(blocking == 1 ? "" : "s")} above.";
                     buildStatusLabel.style.color = errRed;
                     SetFieldBorderColorAndWidth(buildButton, errRed, 1);
                 }
@@ -1877,7 +1902,7 @@ namespace DivineDragon
             else if (PreflightWillBlock())
             {
                 int blocking = PreflightBlockingCount();
-                buildStatusLabel.text = $"Can't build - {blocking} fatal issue{(blocking == 1 ? "" : "s")} above.";
+                buildStatusLabel.text = $"Can't build - {blocking} error{(blocking == 1 ? "" : "s")} above.";
                 buildStatusLabel.style.color = errRed;
                 SetFieldBorderColorAndWidth(buildButton, errRed, 1);
             }

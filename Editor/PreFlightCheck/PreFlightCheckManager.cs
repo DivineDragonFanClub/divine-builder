@@ -47,7 +47,7 @@ namespace DivineDragon.PreFlightCheck
 
             if (EditorApplication.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode)
             {
-                Debug.LogWarning("Pre-flight checks are disabled while the Editor is in play mode.");
+                Debug.LogWarning("Validation checks are disabled while the Editor is in play mode.");
                 return new List<BuildIssue>();
             }
 
@@ -55,7 +55,7 @@ namespace DivineDragon.PreFlightCheck
 
             if (activeRules.Count == 0)
             {
-                Debug.LogWarning("No pre-flight rules are registered and enabled. Skipping checks.");
+                Debug.LogWarning("No validation rules are registered and enabled. Skipping checks.");
                 return new List<BuildIssue>();
             }
 
@@ -63,7 +63,7 @@ namespace DivineDragon.PreFlightCheck
 
             if (settings == null)
             {
-                Debug.LogError("Addressable settings not found. Cannot run pre-flight checks.");
+                Debug.LogError("Addressable settings not found. Cannot run validation checks.");
                 return new List<BuildIssue>();
             }
 
@@ -98,7 +98,7 @@ namespace DivineDragon.PreFlightCheck
                         }
                         catch (Exception ex)
                         {
-                            Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception while validating '{assetPath}': {ex}");
+                            Debug.LogError($"Validation rule '{rule.Name}' threw an exception while validating '{assetPath}': {ex}");
                         }
                     }
                 }
@@ -118,7 +118,7 @@ namespace DivineDragon.PreFlightCheck
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError($"Pre-flight rule '{rule.Name}' threw an exception during {marker}: {ex}");
+                        Debug.LogError($"Validation rule '{rule.Name}' threw an exception during {marker}: {ex}");
                     }
                 }
             }
@@ -197,15 +197,15 @@ namespace DivineDragon.PreFlightCheck
             return savedAnything;
         }
 
-        // The three build-time behaviors, counted for badges and summaries: blocking issues
-        // cancel the build, attention issues ride along as warnings, fixable ones are
-        // cleared by Autofix. Info is none of those.
+        // The build-time behaviors, counted for badges and summaries. Named by the user-facing
+        // severity words: errors (blocking) block the build, major issues ride along as notes,
+        // autofixable ones are cleared by Autofix, minor issues (info) are FYI only.
         public struct TierCounts
         {
-            public int Blocking;   // error severity, no autofix - the only "fatal" tier
-            public int Attention;  // warning severity, no autofix
-            public int Fixable;    // anything the rule can autofix
-            public int Info;
+            public int Blocking;   // error severity, no autofix - "errors", the only blocking tier
+            public int Attention;  // warning severity, no autofix - "major issues"
+            public int Fixable;    // anything the rule can autofix - "autofixable"
+            public int Info;       // "minor issues"
         }
 
         public static TierCounts CountTiers(List<BuildIssue> issues)
@@ -226,9 +226,9 @@ namespace DivineDragon.PreFlightCheck
         }
 
         /// <summary>
-        /// How many issues genuinely block the build: non-autofixable errors, the only
-        /// "fatal" tier. Autofixable issues never block - Autofix repairs them, or with
-        /// Autofix off they just ride along as notes - so they're never counted here.
+        /// How many issues genuinely block the build: non-autofixable errors. Autofixable
+        /// issues never block - Autofix repairs them, or with Autofix off they just ride
+        /// along as notes - so they're never counted here.
         /// </summary>
         public static int WillBlockCount(TierCounts counts)
         {
@@ -240,13 +240,10 @@ namespace DivineDragon.PreFlightCheck
             var parts = new List<string>();
 
             if (counts.Blocking > 0)
-                parts.Add($"{counts.Blocking} fatal issue{(counts.Blocking == 1 ? "" : "s")}");
+                parts.Add($"{counts.Blocking} error{(counts.Blocking == 1 ? "" : "s")}");
 
             if (counts.Attention > 0)
-            {
-                parts.Add($"{counts.Attention} issue{(counts.Attention == 1 ? "" : "s")} " +
-                          $"need{(counts.Attention == 1 ? "s" : "")} attention");
-            }
+                parts.Add($"{counts.Attention} major issue{(counts.Attention == 1 ? "" : "s")}");
 
             if (counts.Fixable > 0)
             {
@@ -256,7 +253,7 @@ namespace DivineDragon.PreFlightCheck
             }
 
             if (counts.Info > 0)
-                parts.Add($"{counts.Info} info");
+                parts.Add($"{counts.Info} minor issue{(counts.Info == 1 ? "" : "s")}");
 
             return parts.Count == 0 ? "No issues found" : string.Join(" · ", parts);
         }

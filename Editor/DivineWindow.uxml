@@ -79,11 +79,9 @@
 
         <ui:VisualElement name="validationContainer" class="dd-card">
             <ui:Label text="Validation" display-tooltip-when-elided="true" name="ValidationLabel" class="dd-section" />
-            <ui:VisualElement name="preflightRow" class="dd-status" style="flex-direction: row; flex-wrap: wrap; align-items: center;">
-                <ui:Label text="Checking for issues…" display-tooltip-when-elided="true" name="preflightBadge" tooltip="Live pre-flight check status" style="margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0;" />
-                <ui:Label text="See issues" display-tooltip-when-elided="true" name="preflightSeeIssues" tooltip="Open the Preflight Check window" style="display: none; margin-left: 8px; margin-right: 0; margin-top: 0; margin-bottom: 0; color: rgb(100, 149, 237);" />
-            </ui:VisualElement>
-            <ui:Toggle label="Run autofix for issues on build" name="autofixCheckbox" tooltip="Automatically fix fixable issues before building. Fatal issues that remain still block the build; warnings don't." style="margin-top: 2px;" />
+            <ui:VisualElement name="preflightRows" class="dd-status" style="flex-direction: column;" />
+            <ui:Button text="See issues" display-tooltip-when-elided="true" name="SeeIssuesButton" tooltip="Open the Validation window" class="dd-btn dd-btn-ghost" style="align-self: flex-start; margin-left: 0; margin-top: 0; margin-bottom: 6px; display: none;" />
+            <ui:Toggle label="Run autofix for issues on build" name="autofixCheckbox" tooltip="Automatically fix fixable issues before building. Errors that can't be fixed still block the build; other issues don't." style="margin-top: 2px;" />
             <ui:Button text="Save &amp; check" display-tooltip-when-elided="true" name="SaveCheckButton" tooltip="Save the open prefab, scenes, and assets, then run the checks against the saved state" class="dd-btn dd-btn-ghost" style="align-self: flex-start; margin-left: 0; margin-top: 6px; display: none;" />
         </ui:VisualElement>
 

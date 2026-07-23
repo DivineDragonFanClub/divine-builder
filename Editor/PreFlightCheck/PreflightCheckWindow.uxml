@@ -1,7 +1,7 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
     <ui:VisualElement name="Root" class="dd-root pf-root">
         <ui:VisualElement name="header" class="dd-header">
-            <ui:Label text="Preflight Check" name="title" class="dd-title" />
+            <ui:Label text="Validation" name="title" class="dd-title" />
             <ui:VisualElement name="accent" class="dd-accent" />
         </ui:VisualElement>
         <ui:Label text="Checks your addressables for problems that would break the build in game, and fixes what it can." display-tooltip-when-elided="true" name="Readme" class="dd-readme" />

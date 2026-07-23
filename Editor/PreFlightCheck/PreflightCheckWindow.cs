@@ -43,18 +43,18 @@ namespace DivineDragon.PreFlightCheck
         private static readonly Color errRed = new Color(0.86f, 0.33f, 0.33f, 1.0f);
         private static readonly Color infoBlue = new Color(0.39f, 0.58f, 0.93f, 1.0f);
 
-        [MenuItem("Divine Dragon/Preflight Check", false, 1510)]
+        [MenuItem("Divine Dragon/Validation", false, 1510)]
         public static void ShowWindow()
         {
             // A regular window (not utility) so it can dock and sit behind other windows
             // instead of floating on top of everything.
-            var window = GetWindow<PreflightCheckWindow>("Preflight Check");
+            var window = GetWindow<PreflightCheckWindow>("Validation");
             window.minSize = new Vector2(480, 400);
         }
 
         public static void ShowWithIssues(List<BuildIssue> issues)
         {
-            var window = GetWindow<PreflightCheckWindow>("Preflight Check");
+            var window = GetWindow<PreflightCheckWindow>("Validation");
             window.minSize = new Vector2(480, 400);
             window.issues = issues;
             window.lastCheckTime = DateTime.Now;
@@ -208,7 +208,7 @@ namespace DivineDragon.PreFlightCheck
         {
             int fixedCount = PreFlightCheckManager.AutoFixAll(toFix);
             if (fixedCount > 0)
-                Debug.Log($"Preflight: autofixed {fixedCount} issue(s).");
+                Debug.Log($"Validation: autofixed {fixedCount} issue(s).");
             RefreshIssues();
         }
 
@@ -357,13 +357,13 @@ namespace DivineDragon.PreFlightCheck
             }
 
             if (blockers.Count > 0)
-                issueList.Add(MakeTierCard($"Fatal ({blockers.Count})", errRed,
-                    "The build can't run until these are fixed by hand - there's no autofix for them.",
+                issueList.Add(MakeTierCard($"Errors ({blockers.Count})", errRed,
+                    "The build can't run until these are fixed by hand. There's no autofix for them.",
                     null, blockers));
 
             if (attention.Count > 0)
-                issueList.Add(MakeTierCard($"Needs your attention ({attention.Count})", warnAmber,
-                    "The build proceeds, but these land in the build report as warnings.",
+                issueList.Add(MakeTierCard($"Major issues ({attention.Count})", warnAmber,
+                    "The build can proceed, but ignoring these may cause problems with your mod.",
                     null, attention));
 
             if (fixable.Count > 0)
@@ -376,13 +376,13 @@ namespace DivineDragon.PreFlightCheck
                 fixAll.AddToClassList("dd-btn");
                 fixAll.AddToClassList("dd-btn-accent");
                 issueList.Add(MakeTierCard($"Autofixable ({fixable.Count})", okGreen,
-                    "Autofix clears these - during the build with the Autofix checkbox, or right now.",
+                    "Autofix clears these - during the build with the Autofix checkbox, or right now if you click the button.",
                     fixAll, fixable));
             }
 
             if (infos.Count > 0)
-                issueList.Add(MakeTierCard($"Info ({infos.Count})", infoBlue,
-                    "Not blocking and not autofixable - things to handle when you're ready. The build ignores these.",
+                issueList.Add(MakeTierCard($"Minor issues ({infos.Count})", infoBlue,
+                    "Not blocking and not autofixable - things to handle when you're ready. The build won't be affected by these.",
                     null, infos));
         }
 
@@ -622,10 +622,10 @@ namespace DivineDragon.PreFlightCheck
             if (issue.Rule.CanAutoFix)
                 return "Autofixable";
             if (issue.Severity == IssueSeverity.Error)
-                return "Fatal - blocks the build";
+                return "Error - blocks the build";
             if (issue.Severity == IssueSeverity.Warning)
-                return "Needs attention";
-            return "Info";
+                return "Major issue";
+            return "Minor issue";
         }
 
         private void ApplyRulesCollapsed(bool collapsed)
@@ -760,7 +760,7 @@ namespace DivineDragon.PreFlightCheck
             {
                 // References go stale when assets get unloaded (play mode round trips
                 // and the like); a fresh check rebuilds them.
-                Debug.LogWarning($"Preflight: '{target.Label}' is no longer loaded. Hit Refresh and try again.");
+                Debug.LogWarning($"Validation: '{target.Label}' is no longer loaded. Hit Refresh and try again.");
                 return;
             }
 

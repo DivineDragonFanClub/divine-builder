@@ -15,7 +15,7 @@ namespace DivineDragon.PreFlightCheck
 
         private PreFlightRuleSettingsProvider(string path, SettingsScope scope) : base(path, scope)
         {
-            label = "Preflight Rules";
+            label = "Validation Rules";
         }
 
         public override void OnGUI(string searchContext)
@@ -194,7 +194,7 @@ namespace DivineDragon.PreFlightCheck
         [SettingsProvider]
         public static SettingsProvider CreateSettingsProvider()
         {
-            return new PreFlightRuleSettingsProvider("Project/Divine Dragon/Preflight Rules", SettingsScope.Project);
+            return new PreFlightRuleSettingsProvider("Project/Divine Dragon/Validation Rules", SettingsScope.Project);
         }
     }
 }
