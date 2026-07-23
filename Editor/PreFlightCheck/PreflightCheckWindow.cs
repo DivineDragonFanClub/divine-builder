@@ -64,6 +64,11 @@ namespace DivineDragon.PreFlightCheck
 
         public void OnEnable()
         {
+            // GetWindow's title only applies on first creation, so a window that already
+            // existed under the old name keeps it. Set it here (runs on every enable and
+            // layout restore) so the tab and title bar always read "Validation".
+            titleContent = new GUIContent("Validation");
+
             // Live results: any completed run (auto sweep, build gate, Refresh) lands here.
             PreFlightCheckManager.ChecksCompleted += OnChecksCompleted;
         }
