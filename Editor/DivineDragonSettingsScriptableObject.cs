@@ -246,6 +246,11 @@ namespace DivineDragon
         // True while buildStatusLabel shows a build outcome; live preflight updates must
         // not overwrite that with a fresh readiness verdict.
         private bool showingBuildOutcome;
+        // The last successful build, kept so the completion time can keep ticking ("just
+        // now" -> "2 minutes ago") like Validation's last-checked line. Null unless a
+        // successful outcome is currently shown.
+        private BuildOutcome lastSuccessOutcome;
+        private DateTime lastBuildCompleteTime;
         private VisualElement buildResults;
         private ScrollView modList;
         private Button tabRyujinx;
@@ -1690,9 +1695,15 @@ namespace DivineDragon
                 };
 
             // Prefab-stage dirtiness has no event, so poll to show the button only when
-            // saving would actually change what the checks see.
+            // saving would actually change what the checks see. Same tick keeps a shown
+            // build-complete time ticking ("just now" -> "2 minutes ago").
             if (preflightRows != null)
-                preflightRows.schedule.Execute(RefreshSaveCheckButton).Every(1000);
+                preflightRows.schedule.Execute(() =>
+                {
+                    RefreshSaveCheckButton();
+                    if (showingBuildOutcome && lastSuccessOutcome != null)
+                        RenderBuildSuccessStatus();
+                }).Every(1000);
 
             UpdatePreflightBadge();
             RefreshSaveCheckButton();
@@ -1826,6 +1837,7 @@ namespace DivineDragon
         private void UpdateBuildStatus()
         {
             showingBuildOutcome = false;
+            lastSuccessOutcome = null;
             SetFieldBorderColorAndWidth(sdPathField, Color.clear, 1);
             SetFieldBorderColorAndWidth(modPathField, Color.clear, 1);
             SetFieldBorderColorAndWidth(buildButton, Color.clear, 1);
@@ -1914,9 +1926,29 @@ namespace DivineDragon
             }
         }
 
+        // Builds the success line, including a completion time that reads the same way as
+        // Validation's last-checked line (HH:mm:ss with relative time). Re-run on the 1s
+        // tick so the relative part stays current while the result sits on screen.
+        private void RenderBuildSuccessStatus()
+        {
+            if (lastSuccessOutcome == null)
+                return;
+
+            string summary =
+                $"Build complete at {TimeFormatter.GetRelativeTimeWithTimestamp(lastBuildCompleteTime)} · " +
+                $"patched {lastSuccessOutcome.Patched}, skipped {lastSuccessOutcome.Skipped} · " +
+                $"{lastSuccessOutcome.ElapsedSeconds:0.0}s";
+            if (!string.IsNullOrEmpty(lastSuccessOutcome.DeliveryNote))
+                summary += " · " + lastSuccessOutcome.DeliveryNote;
+
+            buildStatusLabel.text = summary;
+            buildStatusLabel.style.color = okGreen;
+        }
+
         private void RenderBuildOutcome(BuildOutcome outcome)
         {
             showingBuildOutcome = true;
+            lastSuccessOutcome = null;
             buildResults?.Clear();
 
             if (outcome.Cancelled)
@@ -1929,12 +1961,9 @@ namespace DivineDragon
 
             if (outcome.Success)
             {
-                string summary =
-                    $"Build complete · patched {outcome.Patched}, skipped {outcome.Skipped} · {outcome.ElapsedSeconds:0.0}s";
-                if (!string.IsNullOrEmpty(outcome.DeliveryNote))
-                    summary += " · " + outcome.DeliveryNote;
-                buildStatusLabel.text = summary;
-                buildStatusLabel.style.color = okGreen;
+                lastSuccessOutcome = outcome;
+                lastBuildCompleteTime = DateTime.Now;
+                RenderBuildSuccessStatus();
 
                 if (!string.IsNullOrEmpty(outcome.OutputDirectory) && buildResults != null)
                 {
