@@ -3,17 +3,30 @@ using UnityEditor;
 namespace DivineDragon.PreFlightCheck.Rules
 {
     /// <summary>
-    /// Automatically registers all built-in preflight rules when Unity loads
+    /// Registers every built-in validation rule when Unity loads. One place for all of
+    /// them, grouped by the folders they live in.
     /// </summary>
     [InitializeOnLoad]
     public static class RulesInitializer
     {
         static RulesInitializer()
         {
-            // Register the AddressablePathsRule
+            // Addressable
             PreFlightRuleRegistry.Register<AddressablePathsRule>();
+            PreFlightRuleRegistry.Register<AddressableShaderRule>();
 
-            // Add more rule registrations here as needed
+            // Model
+            PreFlightRuleRegistry.Register<BodyPrefabComplianceRule>();
+            PreFlightRuleRegistry.Register<AccPrefabComplianceRule>();
+            PreFlightRuleRegistry.Register<OBodyAvatarRule>();
+            PreFlightRuleRegistry.Register<SkinnedMeshRendererRule>();
+            PreFlightRuleRegistry.Register<CharaMaterialTexturesRule>();
+
+            // Scene
+            PreFlightRuleRegistry.Register<PrefabOverridesInScenesRule>();
+
+            // Animation
+            PreFlightRuleRegistry.Register<AnimationLoopSettingsRule>();
         }
     }
 }
