@@ -9,6 +9,7 @@ namespace DivineDragon.PreFlightCheck.Rules
     {
         private const string AddressablesRoot = "Assets/Share/Addressables/Item/Acc";
         private const string AddressablesRelativeRoot = "Item/Acc";
+        private const string ShareAddressablesPrefix = "Assets/Share/Addressables/";
         private static readonly Regex FileNameRegex = new Regex(@"^(?<AccType>uAcc|oAcc)_(?<Locator>[^_]+)_(?<Id>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         // Valid locators based on game build analysis
@@ -129,6 +130,41 @@ namespace DivineDragon.PreFlightCheck.Rules
             var directoryMatches = string.Equals(info.DirectoryPath, info.ExpectedDirectoryPath, StringComparison.OrdinalIgnoreCase);
             var nameMatches = string.Equals(info.FileName, info.ExpectedFileName, StringComparison.OrdinalIgnoreCase);
             return directoryMatches && nameMatches;
+        }
+
+        internal static bool IsInExpectedDirectory(AccInfo info)
+        {
+            if (info == null) return false;
+            return string.Equals(info.DirectoryPath, info.ExpectedDirectoryPath, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // True when the address is just an auto-derived form of the asset path: the raw
+        // path Unity assigns when an asset is marked addressable, or that path with the
+        // 'Assets/Share/Addressables/' prefix and/or the file extension stripped.
+        internal static bool IsAddressDerivedFromPath(string address, string assetPath)
+        {
+            if (string.IsNullOrEmpty(address) || string.IsNullOrEmpty(assetPath))
+                return false;
+
+            assetPath = assetPath.Replace('\\', '/');
+            if (AddressMatchesPathForm(address, assetPath))
+                return true;
+
+            return assetPath.StartsWith(ShareAddressablesPrefix, StringComparison.OrdinalIgnoreCase)
+                   && AddressMatchesPathForm(address, assetPath.Substring(ShareAddressablesPrefix.Length));
+        }
+
+        private static bool AddressMatchesPathForm(string address, string path)
+        {
+            if (string.Equals(address, path, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            string extension = Path.GetExtension(path);
+            if (string.IsNullOrEmpty(extension))
+                return false;
+
+            string withoutExtension = path.Substring(0, path.Length - extension.Length);
+            return string.Equals(address, withoutExtension, StringComparison.OrdinalIgnoreCase);
         }
 
         internal static bool EnsureCanonicalLocation(AccInfo info)

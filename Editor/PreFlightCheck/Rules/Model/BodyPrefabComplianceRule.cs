@@ -42,23 +42,43 @@ namespace DivineDragon.PreFlightCheck.Rules
                 return issues;
             }
 
-            bool inExpectedLocation = BodyPathUtility.IsInExpectedLocation(info);
+            bool inExpectedDirectory = BodyPathUtility.IsInExpectedDirectory(info);
+            bool needsRelocation = !inExpectedDirectory || !info.IsFileNameCanonical;
+
+            var settings = AddressableAssetSettingsDefaultObject.Settings;
+            AddressableAssetEntry entry = null;
+            if (settings != null)
+            {
+                string guid = AssetDatabase.AssetPathToGUID(assetPath);
+                entry = settings.FindAssetEntry(guid);
+            }
+
+            // An address that is just the auto-derived form of the current wrong path is a
+            // consequence of the misnaming, so it rides along on the path issue below instead
+            // of getting a row of its own. Missing or hand-edited addresses stay separate.
+            bool addressMatches = entry != null && string.Equals(entry.address, info.ExpectedAddressablePath);
+            bool addressFollowsPath = entry != null && !addressMatches && needsRelocation
+                && BodyPathUtility.IsAddressDerivedFromPath(entry.address, assetPath);
+            string addressNote = addressFollowsPath
+                ? $" The addressable address is derived from this path and will be corrected to '{info.ExpectedAddressablePath}' by the same fix."
+                : string.Empty;
 
             if (!info.IsFileNameCanonical)
             {
                 issues.Add(new BuildIssue(
                     assetPath,
-                    $"{info.BodyType} prefab filename should be '{info.CanonicalFileName}'.",
+                    $"{info.BodyType} prefab filename should be '{info.CanonicalFileName}'.{addressNote}",
                     asset,
                     IssueSeverity.Error,
                     this));
+                addressNote = string.Empty;
             }
 
-            if (!inExpectedLocation)
+            if (!inExpectedDirectory)
             {
                 issues.Add(new BuildIssue(
                     assetPath,
-                    $"{info.BodyType} prefab should reside at '{info.ExpectedAssetPath}'.",
+                    $"{info.BodyType} prefab should reside in folder '{info.ExpectedDirectoryPath}'.{addressNote}",
                     asset,
                     IssueSeverity.Error,
                     this));
@@ -86,7 +106,7 @@ namespace DivineDragon.PreFlightCheck.Rules
                     this));
             }
 
-            if (!inExpectedLocation)
+            if (needsRelocation)
             {
                 foreach (var otherPath in prefabPaths)
                 {
@@ -105,12 +125,8 @@ namespace DivineDragon.PreFlightCheck.Rules
                 }
             }
 
-            var settings = AddressableAssetSettingsDefaultObject.Settings;
             if (settings != null)
             {
-                string guid = AssetDatabase.AssetPathToGUID(assetPath);
-                var entry = settings.FindAssetEntry(guid);
-
                 if (entry == null)
                 {
                     issues.Add(new BuildIssue(
@@ -120,7 +136,7 @@ namespace DivineDragon.PreFlightCheck.Rules
                         IssueSeverity.Error,
                         this));
                 }
-                else if (!string.Equals(entry.address, info.ExpectedAddressablePath))
+                else if (!addressMatches && !addressFollowsPath)
                 {
                     issues.Add(new BuildIssue(
                         assetPath,
