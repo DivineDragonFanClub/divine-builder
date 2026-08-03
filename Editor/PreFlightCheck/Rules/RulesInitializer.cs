@@ -19,6 +19,7 @@ namespace DivineDragon.PreFlightCheck.Rules
             PreFlightRuleRegistry.Register<BodyPrefabComplianceRule>();
             PreFlightRuleRegistry.Register<AccPrefabComplianceRule>();
             PreFlightRuleRegistry.Register<OBodyAvatarRule>();
+            PreFlightRuleRegistry.Register<OBodyOriginCheckRule>();
             PreFlightRuleRegistry.Register<SkinnedMeshRendererRule>();
             PreFlightRuleRegistry.Register<CharaMaterialTexturesRule>();
 
