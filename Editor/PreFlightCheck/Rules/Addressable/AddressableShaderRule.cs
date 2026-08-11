@@ -75,38 +75,60 @@ namespace DivineDragon.PreFlightCheck.Rules
             var owningAsset = asset ?? AssetDatabase.LoadAssetAtPath<Object>(assetPath);
             var checkedMaterials = new HashSet<Material>();
 
-            // 1. Project materials referenced anywhere in the dependency graph.
-            string[] dependencies;
-            try
-            {
-                dependencies = AssetDatabase.GetDependencies(assetPath, true);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"Failed to gather dependencies for '{assetPath}': {ex.Message}");
-                dependencies = Array.Empty<string>();
-            }
+            // 1. Project materials referenced anywhere in the dependency graph. Walked by
+            //    hand instead of GetDependencies(recursive: true) so the walk can stop at
+            //    model files: a model importer in legacy external-materials mode wires
+            //    name-searched project materials into its import result, which the actual
+            //    prefab may not use anywhere. Those don't ship with the addressable, so
+            //    edges through models are not followed.
+            var visitedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var pending = new Queue<string>();
+            visitedPaths.Add(assetPath);
+            pending.Enqueue(assetPath);
 
-            foreach (var dependencyPath in dependencies)
+            while (pending.Count > 0)
             {
-                if (string.IsNullOrEmpty(dependencyPath))
-                    continue;
-                if (!dependencyPath.EndsWith(".mat", StringComparison.OrdinalIgnoreCase))
+                string current = pending.Dequeue();
+
+                if (current.EndsWith(".mat", StringComparison.OrdinalIgnoreCase))
+                {
+                    var material = AssetDatabase.LoadAssetAtPath<Material>(current);
+                    if (material != null && checkedMaterials.Add(material) && !IsShaderAllowed(material.shader))
+                    {
+                        issues.Add(MakeIssue(assetPath, owningAsset,
+                            $"material '{material.name}' ({current})", material.shader, material));
+                    }
+                }
+
+                if (IsModelFile(current))
                     continue;
 
-                var material = AssetDatabase.LoadAssetAtPath<Material>(dependencyPath);
-                if (material == null || !checkedMaterials.Add(material))
+                string[] directDependencies;
+                try
+                {
+                    directDependencies = AssetDatabase.GetDependencies(current, false);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"Failed to gather dependencies for '{current}': {ex.Message}");
                     continue;
-                if (IsShaderAllowed(material.shader))
-                    continue;
+                }
 
-                issues.Add(MakeIssue(assetPath, owningAsset,
-                    $"material '{material.name}' ({dependencyPath})", material.shader, material));
+                foreach (var dependencyPath in directDependencies)
+                {
+                    if (string.IsNullOrEmpty(dependencyPath))
+                        continue;
+                    if (visitedPaths.Add(dependencyPath))
+                    {
+                        pending.Enqueue(dependencyPath);
+                    }
+                }
             }
 
             // 2. Materials assigned directly on renderers. Built-in and inline materials
             //    (Default-Diffuse and friends) live in unity_builtin_extra, never show up
-            //    as a .mat dependency.
+            //    as a .mat dependency. This is also the only place materials a model
+            //    really contributes are checked, since step 1 stops at model files.
             if (owningAsset is GameObject go)
             {
                 foreach (var renderer in go.GetComponentsInChildren<Renderer>(true))
@@ -156,6 +178,19 @@ namespace DivineDragon.PreFlightCheck.Rules
                 return false;
 
             return addressableShaders.Contains(shader);
+        }
+
+        // Formats handled by Unity's ModelImporter. Their import graph is deliberately
+        // not followed - see step 1 in Validate.
+        private static readonly HashSet<string> ModelExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".fbx", ".dae", ".obj", ".blend", ".3ds", ".dxf", ".ma", ".mb", ".max", ".c4d"
+        };
+
+        private static bool IsModelFile(string path)
+        {
+            string extension = System.IO.Path.GetExtension(path);
+            return !string.IsNullOrEmpty(extension) && ModelExtensions.Contains(extension);
         }
     }
 }
