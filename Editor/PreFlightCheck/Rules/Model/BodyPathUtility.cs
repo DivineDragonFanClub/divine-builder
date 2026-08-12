@@ -28,6 +28,17 @@ namespace DivineDragon.PreFlightCheck.Rules
             public string[] PathSegments;
             public bool IsFileNameCanonical;
             public string CanonicalFileName;
+            public bool IdentityFromFolders;
+            public string NameBodyType;
+            public string NameId;
+            public string NameVariant;
+
+            // True when the folders and the file name each name a different body (Id or
+            // body type). Variant-only drift is not a conflict - the rename fix covers it.
+            public bool NameConflictsWithFolders =>
+                IdentityFromFolders && ParsedFromFileName &&
+                (!string.Equals(NameId, Id, StringComparison.OrdinalIgnoreCase) ||
+                 !string.Equals(NameBodyType, BodyType, StringComparison.OrdinalIgnoreCase));
         }
 
         internal static bool TryGetInfo(string assetPath, out BodyInfo info)
@@ -48,34 +59,43 @@ namespace DivineDragon.PreFlightCheck.Rules
 
             string fileName = Path.GetFileNameWithoutExtension(assetPath);
             var match = FileNameRegex.Match(fileName);
+            bool parsedFromFileName = match.Success;
+            string nameBodyType = parsedFromFileName ? match.Groups["BodyType"].Value : null;
+            string nameId = parsedFromFileName ? match.Groups["Id"].Value : null;
+            string nameVariant = parsedFromFileName ? match.Groups["Variant"].Value : null;
+
+            // The folder tree is the source of truth for the body's identity: dropping a
+            // prefab into <bodyType>/<Id>/<Variant>/ is deliberate, while a stale file name
+            // is what duplicating an existing variant leaves behind. The file name only
+            // defines identity when the folders can't (path too shallow to have a variant
+            // level, or 'Prefabs' sitting where the variant folder should be).
             string bodyType;
             string id;
             string variant;
-            bool parsedFromFileName = match.Success;
+            bool identityFromFolders = IsBodyTypeSegment(segments[0]) &&
+                !string.Equals(segments[2], "Prefabs", StringComparison.OrdinalIgnoreCase);
 
-            if (match.Success)
-            {
-                bodyType = match.Groups["BodyType"].Value;
-                id = match.Groups["Id"].Value;
-                variant = match.Groups["Variant"].Value;
-            }
-            else
+            if (identityFromFolders)
             {
                 bodyType = segments[0];
                 id = segments[1];
                 variant = segments[2];
-
-                if (!string.Equals(segments[3], "Prefabs", StringComparison.OrdinalIgnoreCase))
-                    return false;
             }
-
-            if (!string.Equals(bodyType, "uBody", StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(bodyType, "oBody", StringComparison.OrdinalIgnoreCase))
+            else if (parsedFromFileName)
+            {
+                bodyType = nameBodyType;
+                id = nameId;
+                variant = nameVariant;
+            }
+            else
             {
                 return false;
             }
 
-            string expectedDirectory = $"{AddressablesRoot}/{bodyType}/{id}/{variant}/Prefabs";
+            if (!IsBodyTypeSegment(bodyType))
+                return false;
+
+            string expectedDirectory = GetExpectedDirectoryPath(bodyType, id, variant);
             string expectedFileName = $"{bodyType}_{id}_{variant}.prefab";
 
             info = new BodyInfo
@@ -93,10 +113,25 @@ namespace DivineDragon.PreFlightCheck.Rules
                 ParsedFromFileName = parsedFromFileName,
                 PathSegments = segments,
                 IsFileNameCanonical = string.Equals(Path.GetFileName(assetPath), expectedFileName, StringComparison.OrdinalIgnoreCase),
-                CanonicalFileName = expectedFileName
+                CanonicalFileName = expectedFileName,
+                IdentityFromFolders = identityFromFolders,
+                NameBodyType = nameBodyType,
+                NameId = nameId,
+                NameVariant = nameVariant
             };
 
             return true;
+        }
+
+        internal static string GetExpectedDirectoryPath(string bodyType, string id, string variant)
+        {
+            return $"{AddressablesRoot}/{bodyType}/{id}/{variant}/Prefabs";
+        }
+
+        private static bool IsBodyTypeSegment(string value)
+        {
+            return string.Equals(value, "uBody", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "oBody", StringComparison.OrdinalIgnoreCase);
         }
 
         internal static bool IsInExpectedLocation(BodyInfo info)
@@ -188,6 +223,45 @@ namespace DivineDragon.PreFlightCheck.Rules
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+            return true;
+        }
+
+        // Rename/move primitives for the judgment-call issue actions, where the human
+        // already picked the resolution. EnsureCanonicalLocation stays the autofix path.
+        internal static bool RenamePrefab(string assetPath, string targetFileName)
+        {
+            string error = AssetDatabase.RenameAsset(assetPath, Path.GetFileNameWithoutExtension(targetFileName));
+            if (!string.IsNullOrEmpty(error))
+            {
+                UnityEngine.Debug.LogError($"Failed to rename prefab '{assetPath}': {error}");
+                return false;
+            }
+
+            AssetDatabase.SaveAssets();
+            return true;
+        }
+
+        internal static bool MovePrefab(string assetPath, string targetDirectory)
+        {
+            string targetPath = $"{targetDirectory}/{Path.GetFileName(assetPath)}";
+            if (string.Equals(assetPath, targetPath, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(targetPath) != null)
+            {
+                UnityEngine.Debug.LogWarning($"BodyPathUtility: Cannot move prefab to '{targetPath}' because another asset already exists there.");
+                return false;
+            }
+
+            EnsureDirectoryExists(targetDirectory);
+            string error = AssetDatabase.MoveAsset(assetPath, targetPath);
+            if (!string.IsNullOrEmpty(error))
+            {
+                UnityEngine.Debug.LogError($"Failed to move prefab '{assetPath}': {error}");
+                return false;
+            }
+
+            AssetDatabase.SaveAssets();
             return true;
         }
 

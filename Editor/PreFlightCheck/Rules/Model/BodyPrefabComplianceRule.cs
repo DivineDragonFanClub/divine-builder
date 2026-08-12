@@ -42,6 +42,35 @@ namespace DivineDragon.PreFlightCheck.Rules
                 return issues;
             }
 
+            // The name and the folders each claim a different body, not just a different
+            // variant. A stale name and a misfiled prefab look identical here, so no
+            // autofix: the human picks the resolution via the row actions.
+            if (info.NameConflictsWithFolders)
+            {
+                string folderFileName = info.CanonicalFileName;
+                string nameDirectory = BodyPathUtility.GetExpectedDirectoryPath(info.NameBodyType, info.NameId, info.NameVariant);
+                var conflict = new BuildIssue(
+                    assetPath,
+                    $"File name '{info.FileName}' claims {info.NameBodyType}_{info.NameId}_{info.NameVariant}, but the prefab sits in the folder for {info.BodyType}/{info.Id}/{info.Variant}. " +
+                    $"Rename it to '{folderFileName}' to keep it here, or move it to '{nameDirectory}' to match its name.",
+                    asset,
+                    IssueSeverity.Error,
+                    this);
+                conflict.Actions = new List<IssueAction>
+                {
+                    new IssueAction(
+                        "Rename to match folder",
+                        () => BodyPathUtility.RenamePrefab(assetPath, folderFileName),
+                        $"Rename the file to '{folderFileName}' and keep it in this folder"),
+                    new IssueAction(
+                        "Move to match name",
+                        () => BodyPathUtility.MovePrefab(assetPath, nameDirectory),
+                        $"Move the file to '{nameDirectory}' and keep its current name")
+                };
+                issues.Add(conflict);
+                return issues;
+            }
+
             bool inExpectedDirectory = BodyPathUtility.IsInExpectedDirectory(info);
             bool needsRelocation = !inExpectedDirectory || !info.IsFileNameCanonical;
 
@@ -158,6 +187,12 @@ namespace DivineDragon.PreFlightCheck.Rules
             string assetPath = AssetDatabase.GetAssetPath(issue.Asset);
             if (!BodyPathUtility.TryGetInfo(assetPath, out var info))
                 return false;
+
+            if (info.NameConflictsWithFolders)
+            {
+                Debug.LogWarning($"Body Prefab Compliance: '{assetPath}' name and folder disagree on which body this is. Use the issue's Rename/Move buttons to resolve it.");
+                return false;
+            }
 
             var siblingPrefabs = BodyPathUtility.GetPrefabPathsInCanonicalFolder(info);
             foreach (var sibling in siblingPrefabs)
