@@ -23,7 +23,7 @@ namespace DivineDragon.PreFlightCheck.Rules
 
         public override string Name => "Addressable Path Validation";
 
-        public override string Description => "Ensures addressable names follow proper conventions (no Assets/Share/Addressables/ prefix or file extensions)";
+        public override string Description => "Ensures addressable names are derived from the asset's current path - stale addresses left behind by renames or moves point the game at the wrong asset";
 
         public override IssueSeverity DefaultSeverity => IssueSeverity.Warning;
 
@@ -63,46 +63,25 @@ namespace DivineDragon.PreFlightCheck.Rules
                         continue;
 
                     string address = entry.address;
-                    bool hasIssue = false;
-                    string issueDescription = "";
+                    string entryAssetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
+                    string expected = GetExpectedAddress(entryAssetPath, address);
+                    if (string.Equals(address, expected, StringComparison.Ordinal))
+                        continue;
 
-                    // Check for prefix
-                    if (address.StartsWith(PREFIX_TO_REMOVE))
-                    {
-                        hasIssue = true;
-                        issueDescription = $"Address contains '{PREFIX_TO_REMOVE}' prefix";
-                    }
+                    string message = IsUnderAddressablesRoot(entryAssetPath)
+                        ? $"Addressable path '{address}' does not match its asset's location and the game will look for '{expected}'. " +
+                          "Addresses keep their old value when a file is renamed or moved, so this entry points at the wrong name."
+                        : $"Addressable path '{address}' contains the '{PREFIX_TO_REMOVE}' prefix or a file extension. It should be cleaned up for proper Engage compatibility.";
 
-                    // Check for extensions
-                    if (config != null && config.extensionsToRemove != null)
-                    {
-                        foreach (var ext in config.extensionsToRemove)
-                        {
-                            if (address.EndsWith(ext))
-                            {
-                                hasIssue = true;
-                                if (!string.IsNullOrEmpty(issueDescription))
-                                    issueDescription += " and ";
-                                issueDescription += $"ends with '{ext}'";
-                                break;
-                            }
-                        }
-                    }
-
-                    if (hasIssue)
-                    {
-                        string entryAssetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
-                        var entryAsset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(entryAssetPath);
-
-                        issues.Add(new BuildIssue(
-                            entryAssetPath,
-                            $"Addressable path '{address}' {issueDescription}. It should be cleaned up for proper Engage compatibility.",
-                            entryAsset,
-                            DefaultSeverity,
-                            this,
-                            null  // Can't pass AddressableAssetEntry as it's not a UnityEngine.Object
-                        ));
-                    }
+                    var entryAsset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(entryAssetPath);
+                    issues.Add(new BuildIssue(
+                        entryAssetPath,
+                        message,
+                        entryAsset,
+                        DefaultSeverity,
+                        this,
+                        null  // Can't pass AddressableAssetEntry as it's not a UnityEngine.Object
+                    ));
                 }
             }
 
@@ -130,32 +109,13 @@ namespace DivineDragon.PreFlightCheck.Rules
                     if (entryAssetPath == issue.AssetPath)
                     {
                         string originalAddress = entry.address;
-                        string newAddress = originalAddress;
-
-                        // Remove prefix
-                        if (newAddress.StartsWith(PREFIX_TO_REMOVE))
-                        {
-                            newAddress = newAddress.Substring(PREFIX_TO_REMOVE.Length);
-                        }
-
-                        // Remove extensions
-                        if (config != null && config.extensionsToRemove != null)
-                        {
-                            foreach (var ext in config.extensionsToRemove)
-                            {
-                                if (newAddress.EndsWith(ext))
-                                {
-                                    newAddress = newAddress.Substring(0, newAddress.Length - ext.Length);
-                                    break;
-                                }
-                            }
-                        }
+                        string newAddress = GetExpectedAddress(entryAssetPath, originalAddress);
 
                         if (newAddress != originalAddress)
                         {
                             entry.address = newAddress;
                             EditorUtility.SetDirty(addressableSettings);
-                            Debug.Log($"Fixed addressable path: '{originalAddress}' → '{newAddress}'");
+                            Debug.Log($"Fixed addressable path: '{originalAddress}' -> '{newAddress}'");
                             return true;
                         }
                     }
@@ -163,6 +123,54 @@ namespace DivineDragon.PreFlightCheck.Rules
             }
 
             return false;
+        }
+
+        private static bool IsUnderAddressablesRoot(string assetPath)
+        {
+            return !string.IsNullOrEmpty(assetPath) && assetPath.StartsWith(PREFIX_TO_REMOVE, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// The address an entry is supposed to carry. For assets under the addressables
+        /// root it is derived from the asset's current path (prefix stripped), which also
+        /// catches addresses gone stale after a rename or move - Unity freezes the address
+        /// at mark time and never updates it. Anything outside the root has no path
+        /// convention, so only the prefix/extension cleanup applies to its address.
+        /// </summary>
+        private string GetExpectedAddress(string assetPath, string currentAddress)
+        {
+            if (IsUnderAddressablesRoot(assetPath))
+            {
+                return StripConfiguredExtension(assetPath.Substring(PREFIX_TO_REMOVE.Length));
+            }
+
+            string cleaned = currentAddress;
+            if (cleaned.StartsWith(PREFIX_TO_REMOVE))
+            {
+                cleaned = cleaned.Substring(PREFIX_TO_REMOVE.Length);
+            }
+
+            return StripConfiguredExtension(cleaned);
+        }
+
+        // Engage strips only the configured extensions from addresses and keeps every
+        // other one (.controller, .mat, .txt, ...) - see the vanilla bundles, e.g.
+        // unitanims/template/uac_template.controller.bundle next to the extensionless
+        // anim and prefab bundles.
+        private string StripConfiguredExtension(string value)
+        {
+            if (config == null || config.extensionsToRemove == null)
+                return value;
+
+            foreach (var ext in config.extensionsToRemove)
+            {
+                if (!string.IsNullOrEmpty(ext) && value.EndsWith(ext))
+                {
+                    return value.Substring(0, value.Length - ext.Length);
+                }
+            }
+
+            return value;
         }
 
         public override void DrawConfiguration()
@@ -180,7 +188,7 @@ namespace DivineDragon.PreFlightCheck.Rules
             EditorGUILayout.Space(5);
 
             // Info about prefix removal
-            EditorGUILayout.HelpBox($"Always removes '{PREFIX_TO_REMOVE}' prefix from addressable paths", MessageType.Info);
+            EditorGUILayout.HelpBox($"Always removes the '{PREFIX_TO_REMOVE}' prefix from addressable paths. Only the listed extensions are stripped - Engage keeps every other extension in the address (.controller, .mat, .txt and so on), so don't list those.", MessageType.Info);
             EditorGUILayout.Space(5);
 
             // Extensions to remove
