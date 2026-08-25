@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using DivineDragon.Patcher;
 using UnityEditor;
@@ -80,6 +81,54 @@ namespace DivineDragon
                     return Fail(outcome, sw, "FTP", "(ftp)",
                         $"Could not reach the FTP device at {settings.getFtpHost()}:{settings.getFtpPort()}.");
                 }
+            }
+
+            // Validate addressables before the expensive build. With Autofix on, fixable
+            // issues are repaired first. Of whatever remains, only errors with no autofix
+            // block the build. Everything else that isn't a minor issue rides along on the
+            // outcome as a note - including fixable issues left unfixed when Autofix is off.
+            if (settings.getPreBuildAutofix())
+            {
+                var initialIssues = PreFlightCheck.PreFlightCheckManager.RunAllChecks();
+                if (initialIssues.Any(i => i.Rule.CanAutoFix))
+                {
+                    int fixedCount = PreFlightCheck.PreFlightCheckManager.AutoFixAll(initialIssues);
+                    Debug.Log($"Divine Builder: autofixed {fixedCount} validation issue(s).");
+                }
+            }
+
+            var validationIssues = PreFlightCheck.PreFlightCheckManager.RunAllChecks();
+            var blockingErrors = validationIssues
+                .Where(i => i.Severity == PreFlightCheck.IssueSeverity.Error && !i.Rule.CanAutoFix).ToList();
+            foreach (var issue in validationIssues)
+            {
+                // Minor issues (info) are window-only; blocking errors are reported below.
+                if (issue.Severity == PreFlightCheck.IssueSeverity.Info) continue;
+                if (issue.Severity == PreFlightCheck.IssueSeverity.Error && !issue.Rule.CanAutoFix) continue;
+
+                string warning = $"Validation: {issue.AssetPath}: {issue.Message}";
+                outcome.Warnings.Add(warning);
+                Debug.LogWarning($"Divine Builder: {warning}");
+            }
+
+            if (blockingErrors.Count > 0)
+            {
+                PreFlightCheck.PreflightCheckWindow.ShowWithIssues(validationIssues);
+                Debug.LogError($"Divine Builder: build cancelled, {blockingErrors.Count} validation error(s) found. " +
+                               "See the Validation window.");
+                outcome.FailureStage = "validation";
+                foreach (var issue in blockingErrors)
+                {
+                    outcome.Errors.Add(new BuildError
+                    {
+                        BundlePath = issue.AssetPath,
+                        Kind = BuildErrorKind.PreFlight,
+                        Detail = issue.Message,
+                        Hint = "Fix it in the Validation window."
+                    });
+                }
+                outcome.ElapsedSeconds = sw.Elapsed.TotalSeconds;
+                return outcome;
             }
 
             AddressableAssetSettings

@@ -7,6 +7,7 @@ namespace DivineDragon.Patcher
         MissingCacheEntry,
         MissingUacClip,
         BundleIo,
+        PreFlight,
     }
 
     public class BuildError
